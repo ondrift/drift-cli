@@ -22,14 +22,6 @@ var defaultGolangContentsGet string
 //go:embed languages/golang_ws.txt
 var defaultGolangContentsWS string
 
-//go:embed languages/python_post.txt
-var defaultPythonContentsPost string
-
-//go:embed languages/python_get.txt
-var defaultPythonContentsGet string
-
-//go:embed languages/python_ws.txt
-var defaultPythonContentsWS string
 
 func Go() *cobra.Command {
 	atomicNewCmd := &cobra.Command{
@@ -41,20 +33,7 @@ func Go() *cobra.Command {
 		SilenceErrors:      true,
 		Run: func(cmd *cobra.Command, args []string) {
 			auth := "none"
-			var lang, endpointType, method, name string
-
-			// Language
-			langPrompt := &survey.Select{
-				Message: "Select language:",
-				Options: []string{"Go", "Python"},
-				VimMode: true,
-			}
-			_ = survey.AskOne(langPrompt, &lang)
-			if lang == "Go" {
-				lang = "go"
-			} else {
-				lang = "python"
-			}
+			var endpointType, method, name string
 
 			// Endpoint type
 			typePrompt := &survey.Select{
@@ -90,30 +69,20 @@ func Go() *cobra.Command {
 			}
 			_ = survey.AskOne(authPrompt, &auth)
 
-			var err error
-			if lang == "python" {
-				err = GenerateAtomicFunctionPython(name, method, auth)
-			} else {
-				err = GenerateAtomicFunction(name, method, lang, auth)
-			}
+			err := GenerateAtomicFunction(name, method, "go", auth)
 			if err != nil {
 				fmt.Printf("❌ Error: %v\n", err)
 				return
 			}
 
-			// Integrations (Go only — Python uses vendor/ instead)
-			if lang == "go" {
-				var integrations []string
-				integrationPrompt := &survey.MultiSelect{
-					Message: "Select integrations:",
-					Options: []string{"shush", "backbone"},
-					VimMode: true,
-				}
-				_ = survey.AskOne(integrationPrompt, &integrations)
-				fmt.Printf("✅ Atomic function '%s' created with integrations: %v\n\n", name, integrations)
-			} else {
-				fmt.Printf("✅ Atomic function '%s' created (Python)\n\n", name)
+			var integrations []string
+			integrationPrompt := &survey.MultiSelect{
+				Message: "Select integrations:",
+				Options: []string{"shush", "backbone"},
+				VimMode: true,
 			}
+			_ = survey.AskOne(integrationPrompt, &integrations)
+			fmt.Printf("✅ Atomic function '%s' created with integrations: %v\n\n", name, integrations)
 
 			fmt.Printf("🧪 Test it locally:\n\tdrift atomic run %s\n\n", name)
 			fmt.Printf("🚀 Deploy it:\n\tdrift atomic deploy %s\n\n", name)
@@ -126,71 +95,13 @@ func Go() *cobra.Command {
 	return atomicNewCmd
 }
 
-func GenerateAtomicFunctionPython(name, method, auth string) error {
-	var handler string
-	mainFile := filepath.Join(name, "handler.py")
-
-	nameUpper := common.CapitalizeFirst(strings.ToLower(name))
-
-	switch strings.ToLower(method) {
-	case "post":
-		replacer := strings.NewReplacer(
-			"{{NAME}}", name,
-			"{{NAME_UPPER}}", nameUpper,
-			"{{AUTH}}", auth,
-		)
-		handler = replacer.Replace(defaultPythonContentsPost)
-	case "get":
-		replacer := strings.NewReplacer(
-			"{{NAME}}", name,
-			"{{NAME_UPPER}}", nameUpper,
-			"{{AUTH}}", auth,
-		)
-		handler = replacer.Replace(defaultPythonContentsGet)
-	case "ws":
-		replacer := strings.NewReplacer(
-			"{{NAME}}", name,
-			"{{NAME_UPPER}}", nameUpper,
-			"{{AUTH}}", auth,
-		)
-		handler = replacer.Replace(defaultPythonContentsWS)
-	}
-
-	if err := os.MkdirAll(name, 0o750); err != nil {
-		return fmt.Errorf("failed to create function directory: %w", err)
-	}
-
-	if err := os.WriteFile(mainFile, []byte(handler), 0o600); err != nil {
-		return fmt.Errorf("failed to write handler.py: %w", err)
-	}
-
-	// requirements.txt — websockets only needed for WS endpoints
-	var requirements string
-	if strings.ToLower(method) == "ws" {
-		requirements = "websockets>=12.0\n"
-	}
-	if err := os.WriteFile(filepath.Join(name, "requirements.txt"), []byte(requirements), 0o600); err != nil {
-		return fmt.Errorf("failed to write requirements.txt: %w", err)
-	}
-
-	dotEnv := "# Secrets for local development — loaded automatically by 'drift atomic run'\n# These values are pushed to Backbone Secrets on 'drift atomic deploy'\n#\n# Example:\n# DATABASE_URL=postgres://localhost:5432/mydb\n# API_KEY=your-api-key-here\n"
-	if err := os.WriteFile(filepath.Join(name, ".env"), []byte(dotEnv), 0o600); err != nil {
-		return fmt.Errorf("failed to write .env file: %w", err)
-	}
-
-	gitignore := ".env\nvendor/\n__pycache__/\n"
-	if err := os.WriteFile(filepath.Join(name, ".gitignore"), []byte(gitignore), 0o600); err != nil {
-		return fmt.Errorf("failed to write .gitignore: %w", err)
-	}
-
-	return nil
-}
-
 func GenerateAtomicFunction(name, method, language, auth string) error {
 	var handler string
 	mainFile := filepath.Join(name, fmt.Sprintf("%s.go", name))
 	dependenciesFile := filepath.Join(name, "go.mod")
-	dependenciesFileContents := fmt.Sprintf("module atomic/%s\n\ngo 1.25.5", name)
+
+	// WASM functions depend on drift-sdk; WebSocket falls back to native.
+	var dependenciesFileContents string
 
 	switch strings.ToLower(method) {
 	case "post":
@@ -201,6 +112,10 @@ func GenerateAtomicFunction(name, method, language, auth string) error {
 			"{{AUTH}}", auth,
 		)
 		handler = replacer.Replace(defaultGolangContentsPost)
+		dependenciesFileContents = fmt.Sprintf(
+			"module atomic/%s\n\ngo 1.25\n\nrequire drift-sdk v0.0.0\n",
+			name,
+		)
 	case "get":
 		replacer := strings.NewReplacer(
 			"{{NAME}}", name,
@@ -209,6 +124,10 @@ func GenerateAtomicFunction(name, method, language, auth string) error {
 			"{{AUTH}}", auth,
 		)
 		handler = replacer.Replace(defaultGolangContentsGet)
+		dependenciesFileContents = fmt.Sprintf(
+			"module atomic/%s\n\ngo 1.25\n\nrequire drift-sdk v0.0.0\n",
+			name,
+		)
 	case "ws":
 		replacer := strings.NewReplacer(
 			"{{NAME}}", name,
@@ -217,7 +136,7 @@ func GenerateAtomicFunction(name, method, language, auth string) error {
 		)
 		handler = replacer.Replace(defaultGolangContentsWS)
 		dependenciesFileContents = fmt.Sprintf(
-			"module atomic/%s\n\ngo 1.25.5\n\nrequire github.com/gorilla/websocket v1.5.3\n",
+			"module atomic/%s\n\ngo 1.25\n\nrequire github.com/gorilla/websocket v1.5.3\n",
 			name,
 		)
 	}

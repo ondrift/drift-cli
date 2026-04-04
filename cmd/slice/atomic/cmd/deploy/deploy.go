@@ -1,14 +1,12 @@
 package atomic_cmd
 
 import (
-	"archive/zip"
 	"bufio"
 	"bytes"
 	_ "embed"
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -25,124 +23,40 @@ import (
 	"github.com/spf13/cobra"
 )
 
-//go:embed default/server_post.txt
-var defaultGolangServerPost string
+//go:embed default/server_post_wasm.txt
+var defaultWasmServerPost string
 
-//go:embed default/server_get.txt
-var defaultGolangServerGet string
+//go:embed default/server_get_wasm.txt
+var defaultWasmServerGet string
 
+// Native fallback for WebSocket (WASI P1 has no socket support).
 //go:embed default/server_ws.txt
 var defaultGolangServerWS string
 
-//go:embed default/server_post.py
-var defaultPythonServerPost string
-
-//go:embed default/server_get.py
-var defaultPythonServerGet string
-
-//go:embed default/server_ws.py
-var defaultPythonServerWS string
-
-func generateMain(dir, funcName, route, method string, port int) error {
+// generateMainWasm writes a WASM-compatible main.go that wraps the user's
+// handler function using the drift SDK stdin/stdout protocol.
+func generateMainWasm(dir, funcName, method string) error {
 	var code string
+	replacer := strings.NewReplacer("{{FUNC}}", funcName)
+	switch method {
+	case "post":
+		code = replacer.Replace(defaultWasmServerPost)
+	case "get":
+		code = replacer.Replace(defaultWasmServerGet)
+	}
+	return os.WriteFile(filepath.Join(dir, "main.go"), []byte(code), 0o600)
+}
+
+// generateMainNative writes a native main.go for WebSocket functions
+// (WASI P1 has no socket support, so WS falls back to the old path).
+func generateMainNative(dir, funcName, route string, port int) error {
 	replacer := strings.NewReplacer(
 		"{{FUNC}}", funcName,
 		"{{ROUTE}}", route,
 		"{{PORT}}", fmt.Sprintf("%d", port),
 	)
-	switch method {
-	case "post":
-		code = replacer.Replace(defaultGolangServerPost)
-	case "get":
-		code = replacer.Replace(defaultGolangServerGet)
-	case "ws":
-		code = replacer.Replace(defaultGolangServerWS)
-	}
-
+	code := replacer.Replace(defaultGolangServerWS)
 	return os.WriteFile(filepath.Join(dir, "main.go"), []byte(code), 0o600)
-}
-
-// detectLanguage returns "python" if the folder contains handler.py, else "golang".
-func detectLanguage(folder string) string {
-	if _, err := os.Stat(filepath.Join(folder, "handler.py")); err == nil {
-		return "python"
-	}
-	return "golang"
-}
-
-// generatePythonServer writes server.py into dir from the appropriate template.
-func generatePythonServer(dir, funcName, name, method, auth, element string) error {
-	var code string
-	replacer := strings.NewReplacer(
-		"{{FUNC}}", funcName,
-		"{{FUNCTION_NAME}}", name,
-		"{{FUNCTION_METHOD}}", method,
-		"{{FUNCTION_AUTH}}", auth,
-		"{{FUNCTION_ELEMENT}}", element,
-	)
-	switch strings.ToLower(method) {
-	case "post":
-		code = replacer.Replace(defaultPythonServerPost)
-	case "get":
-		code = replacer.Replace(defaultPythonServerGet)
-	case "ws":
-		code = replacer.Replace(defaultPythonServerWS)
-	}
-	return os.WriteFile(filepath.Join(dir, "server.py"), []byte(code), 0o600)
-}
-
-// zipPythonFolder zips handler.py, server.py, requirements.txt, and the vendor/
-// directory (if present) into a single archive written to destPath.
-func zipPythonFolder(folder, destPath string) error {
-	out, err := os.Create(destPath) // #nosec G304 — CLI tool creates temp zip by design
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	zw := zip.NewWriter(out)
-	defer zw.Close()
-
-	include := []string{"handler.py", "server.py", "requirements.txt"}
-	for _, name := range include {
-		src := filepath.Join(folder, name)
-		if _, err := os.Stat(src); os.IsNotExist(err) {
-			continue
-		}
-		if err := addFileToZip(zw, src, name); err != nil {
-			return err
-		}
-	}
-
-	// Add vendor/ directory recursively
-	vendorDir := filepath.Join(folder, "vendor")
-	if _, err := os.Stat(vendorDir); err == nil {
-		err = filepath.Walk(vendorDir, func(path string, info os.FileInfo, err error) error {
-			if err != nil || info.IsDir() {
-				return err
-			}
-			rel, _ := filepath.Rel(folder, path)
-			return addFileToZip(zw, path, rel)
-		})
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func addFileToZip(zw *zip.Writer, srcPath, zipPath string) error {
-	data, err := os.ReadFile(srcPath) // #nosec G304 — CLI tool reads user files by design
-	if err != nil {
-		return err
-	}
-	w, err := zw.Create(zipPath)
-	if err != nil {
-		return err
-	}
-	_, err = w.Write(data)
-	return err
 }
 
 
@@ -365,11 +279,12 @@ func syncEnvToBackbone(folder string) ([]string, error) {
 
 // sendSourceToOperator streams the compiled binary/zip to the API as
 // multipart/form-data — no base64 encoding, no heap-resident copy of the file.
-func sendSourceToOperator(name, method, language, element, sourcePath string, envKeys []string, triggers []TriggerSpec) error {
+func sendSourceToOperator(name, method, language, auth, element, sourcePath string, envKeys []string, triggers []TriggerSpec) error {
 	meta, err := json.Marshal(map[string]any{
 		"name":     name,
 		"method":   method,
 		"language": language,
+		"auth":     auth,
 		"element":  element,
 		"env_keys": envKeys,
 		"triggers": triggers,
@@ -480,7 +395,6 @@ func DeployFolder(folder, element string) error {
 		return fmt.Errorf("failed to resolve folder path: %w", err)
 	}
 
-	lang := detectLanguage(absFolder)
 	namePascal := ""
 	for _, seg := range strings.Split(name, "-") {
 		namePascal += common.CapitalizeFirst(strings.ToLower(seg))
@@ -489,38 +403,11 @@ func DeployFolder(folder, element string) error {
 
 	var sourcePath, language string
 
-	if lang == "python" {
-		language = "python"
-
-		if err := generatePythonServer(absFolder, funcName, name, method, auth, element); err != nil {
-			return fmt.Errorf("failed to generate server.py: %w", err)
-		}
-
-		reqPath := filepath.Join(absFolder, "requirements.txt")
-		if _, err := os.Stat(reqPath); err == nil {
-			fmt.Println("Installing Python dependencies...")
-			pip := exec.Command( // #nosec G204 — controlled pip invocation
-				"pip3", "install", "-r", "requirements.txt",
-				"--target", "vendor", "--quiet",
-			)
-			pip.Dir = absFolder
-			if out, err := pip.CombinedOutput(); err != nil {
-				log.Printf("pip install error: %v, output: %s", err, string(out))
-			}
-		}
-
-		zipPath := filepath.Join(absFolder, "source.zip")
-		if err := zipPythonFolder(absFolder, zipPath); err != nil {
-			return fmt.Errorf("failed to create source zip: %w", err)
-		}
-		defer os.Remove(zipPath)
-		defer os.Remove(filepath.Join(absFolder, "server.py"))
-
-		sourcePath = zipPath
-	} else {
+	// WebSocket functions fall back to native Go compilation (WASI P1 has no socket support).
+	if strings.ToLower(method) == "ws" {
 		language = "golang"
 
-		if err := generateMain(absFolder, funcName, "/"+name, method, 8080); err != nil {
+		if err := generateMainNative(absFolder, funcName, "/"+name, 8080); err != nil {
 			return fmt.Errorf("failed to generate main.go: %w", err)
 		}
 		defer os.Remove(filepath.Join(absFolder, "main.go"))
@@ -547,9 +434,38 @@ func DeployFolder(folder, element string) error {
 		defer os.Remove(filepath.Join(absFolder, "app"))
 
 		sourcePath = filepath.Join(absFolder, "app")
+	} else {
+		// POST/GET/PUT/DELETE — compile to WASM via drift SDK.
+		language = "wasm"
+
+		if err := generateMainWasm(absFolder, funcName, method); err != nil {
+			return fmt.Errorf("failed to generate main.go: %w", err)
+		}
+		defer os.Remove(filepath.Join(absFolder, "main.go"))
+
+		command := exec.Command( // #nosec G204 — controlled go toolchain invocation
+			"go", "mod", "download",
+			fmt.Sprintf("-modfile=%s/go.mod", absFolder),
+		)
+		command.Dir = absFolder
+		if out, err := command.CombinedOutput(); err != nil {
+			fmt.Printf("Error running go mod download: %v\nOutput: %s\n", err, string(out))
+		}
+
+		command = exec.Command( // #nosec G204 — controlled go toolchain invocation
+			"go", "build", "-o", "app.wasm",
+		)
+		command.Dir = absFolder
+		command.Env = append(os.Environ(), "GOOS=wasip1", "GOARCH=wasm")
+		if out, err := command.CombinedOutput(); err != nil {
+			return fmt.Errorf("go build error: %w\n%s", err, string(out))
+		}
+		defer os.Remove(filepath.Join(absFolder, "app.wasm"))
+
+		sourcePath = filepath.Join(absFolder, "app.wasm")
 	}
 
-	if err := sendSourceToOperator(name, method, language, element, sourcePath, envKeys, triggers); err != nil {
+	if err := sendSourceToOperator(name, method, language, auth, element, sourcePath, envKeys, triggers); err != nil {
 		return err
 	}
 

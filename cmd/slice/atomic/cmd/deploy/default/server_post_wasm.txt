@@ -1,0 +1,17 @@
+package main
+
+import (
+	"encoding/json"
+
+	"drift-sdk"
+)
+
+func main() {
+	drift.Run(func(req drift.Request) drift.Response {
+		var body RequestBody
+		_ = json.Unmarshal(req.Body, &body)
+		status, message, payload := {{FUNC}}(body)
+		data, _ := json.Marshal(payload)
+		return drift.Response{Status: status, Message: message, Payload: data}
+	})
+}
