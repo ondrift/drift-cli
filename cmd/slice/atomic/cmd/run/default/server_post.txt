@@ -1,0 +1,73 @@
+package main
+
+import (
+	"bufio"
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+)
+
+// ===== Panic Recovery Middleware =====
+func recoveryMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if rec := recover(); rec != nil {
+				log.Printf("recovered from panic: %v", rec)
+				http.Error(w, "internal server error", http.StatusInternalServerError)
+			}
+		}()
+		next(w, r)
+	}
+}
+
+// ===== Main =====
+func main() {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "3000" // sensible local default
+	}
+
+	re, wr, _ := os.Pipe()
+	os.Stdout = wr
+	os.Stderr = wr
+
+	go func() {
+		scanner := bufio.NewScanner(re)
+		for scanner.Scan() {
+			line := scanner.Text()
+			fmt.Printf("[Captured] %s\n", line) // for debugging only
+		}
+	}()
+
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("{{ROUTE}}", recoveryMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+
+		var req RequestBody
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		status, message, data := {{FUNC}}(req)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(status)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  status,
+			"message": message,
+			"payload": data,
+		})
+	}))
+
+	server := &http.Server{
+		Addr:    fmt.Sprintf(":%s", port),
+		Handler: mux,
+	}
+
+	log.Printf("🚀 Starting server on http://localhost:%s", port)
+	log.Fatal(server.ListenAndServe())
+}
