@@ -124,19 +124,12 @@ func GetSignupCmd() *cobra.Command {
 			}
 
 			fmt.Printf("\n\033[48;2;241;160;6m"+" "+"\033[0m"+" Welcome to Drift, %s!\n", username)
-			fmt.Printf("\033[48;2;130;106;235m" + " " + "\033[0m" + " You're currently on the 'hacker' tier.")
-			fmt.Println("\n\033[48;2;61;213;166m" + " " + "\033[0m" + " You have access to the following free services:")
-			fmt.Println("  *  5 Atomic functions (10s max runtime)         :: 'drift atomic'")
-			fmt.Println("  *  3 scheduled jobs (cron triggers)             :: 'drift atomic deploy'")
-			fmt.Println("  *  3 Backbone NoSQL collections (100 MB)        :: 'drift backbone nosql'")
-			fmt.Println("  *  1 Backbone Vector collection (5K vectors)    :: 'drift backbone vector'")
-			fmt.Println("  *  3 Backbone Queues                            :: 'drift backbone queue'")
-			fmt.Println("  *  25 Backbone Blobs (up to 10 MB each)         :: 'drift backbone blob'")
-			fmt.Println("  *  10 Backbone Secrets (up to 2 KB each)        :: 'drift backbone secret'")
-			fmt.Println("  *  1 Canvas site (up to 50 MB)                  :: 'drift canvas'")
-			fmt.Println("\nCheck your usage anytime                         :: 'drift account usage'")
-			fmt.Println("Preview a deployment against your quota           :: 'drift plan drift.yaml'")
-			fmt.Println("When you're ready to upgrade                      :: 'drift account upgrade prototyper'")
+			fmt.Println("\n\033[48;2;61;213;166m" + " " + "\033[0m" + " Next steps:")
+			fmt.Println("  1. Create your first slice (project)            :: 'drift slice create <name>'")
+			fmt.Println("  2. Deploy your app                              :: 'drift deploy drift.yaml'")
+			fmt.Println("\nManage slices                                    :: 'drift slice list'")
+			fmt.Println("Switch active slice                               :: 'drift slice use <name>'")
+			fmt.Println("Check your usage anytime                          :: 'drift account usage'")
 			fmt.Println("Happy building!")
 		},
 		Example: "drift signup",

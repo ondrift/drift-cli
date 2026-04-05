@@ -18,7 +18,7 @@ func nosqlCmd() *cobra.Command {
 		Use:   "nosql",
 		Short: "Read and write JSON documents to the Backbone NoSQL store",
 	}
-	cmd.AddCommand(nosqlWriteCmd(), nosqlReadCmd(), nosqlDropCmd())
+	cmd.AddCommand(nosqlWriteCmd(), nosqlReadCmd(), nosqlListCmd(), nosqlDropCmd())
 	return cmd
 }
 
@@ -113,6 +113,66 @@ func nosqlDropCmd() *cobra.Command {
 			fmt.Printf("✅ Collection %q dropped\n", name)
 		},
 	}
+}
+
+func nosqlListCmd() *cobra.Command {
+	var collection, field, value string
+	var limit int
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List all documents in a collection, with optional field filtering",
+		Args:  cobra.NoArgs,
+		Run: func(cmd *cobra.Command, args []string) {
+			url := fmt.Sprintf("http://api.localhost:30036/ops/backbone/nosql/list?collection=%s&limit=%d", collection, limit)
+			if field != "" && value != "" {
+				url += "&field=" + field + "&value=" + value
+			}
+
+			req, err := common.NewAuthenticatedRequest(http.MethodGet, url, nil)
+			if err != nil {
+				fmt.Println("❌ Not logged in:", err)
+				return
+			}
+
+			client := &http.Client{Timeout: 10 * time.Second}
+			resp, err := client.Do(req)
+			if err != nil {
+				fmt.Println("❌ Failed to contact API:", err)
+				return
+			}
+			defer resp.Body.Close()
+
+			b, _ := io.ReadAll(resp.Body)
+			if resp.StatusCode != http.StatusOK {
+				fmt.Printf("❌ List failed: %s\n", string(b))
+				return
+			}
+
+			// Pretty-print the JSON array.
+			var docs []json.RawMessage
+			if err := json.Unmarshal(b, &docs); err != nil {
+				fmt.Println(string(b))
+				return
+			}
+
+			if len(docs) == 0 {
+				fmt.Println("(no documents)")
+				return
+			}
+
+			for _, doc := range docs {
+				var pretty bytes.Buffer
+				json.Indent(&pretty, doc, "", "  ")
+				fmt.Println(pretty.String())
+			}
+			fmt.Printf("\n%d document(s)\n", len(docs))
+		},
+	}
+	cmd.Flags().StringVar(&collection, "collection", "default", "Collection name")
+	cmd.Flags().StringVar(&field, "field", "", "Filter by field name")
+	cmd.Flags().StringVar(&value, "value", "", "Filter by field value (requires --field)")
+	cmd.Flags().IntVar(&limit, "limit", 100, "Maximum number of documents to return")
+	return cmd
 }
 
 func nosqlReadCmd() *cobra.Command {

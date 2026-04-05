@@ -9,6 +9,7 @@ import (
 	atomic "cli/cmd/slice/atomic"
 	backbone "cli/cmd/slice/backbone"
 	canvas "cli/cmd/slice/canvas"
+	lifecycle "cli/cmd/slice/lifecycle"
 
 	"github.com/spf13/cobra"
 )
@@ -44,6 +45,9 @@ func main() {
 
 		// Backbone primitives (secrets, queues, blobs)
 		backbone.GetCmd(),
+
+		// Slice lifecycle (create, list, use, delete, upgrade)
+		lifecycle.GetCmd(),
 
 		// Account (signup, login, usage, upgrade)
 		account.GetAccountCmd(),

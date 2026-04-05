@@ -3,7 +3,7 @@ package atomic_cmd
 import (
 	"bufio"
 	"bytes"
-	_ "embed"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -29,9 +29,11 @@ var defaultWasmServerPost string
 //go:embed default/server_get_wasm.txt
 var defaultWasmServerGet string
 
-// Native fallback for WebSocket (WASI P1 has no socket support).
-//go:embed default/server_ws.txt
-var defaultGolangServerWS string
+// Embedded drift-sdk source — extracted to a temp dir at deploy time so that
+// `go mod edit -replace` can point the user's go.mod at it.
+//
+//go:embed sdk
+var embeddedSDK embed.FS
 
 // generateMainWasm writes a WASM-compatible main.go that wraps the user's
 // handler function using the drift SDK stdin/stdout protocol.
@@ -47,18 +49,42 @@ func generateMainWasm(dir, funcName, method string) error {
 	return os.WriteFile(filepath.Join(dir, "main.go"), []byte(code), 0o600)
 }
 
-// generateMainNative writes a native main.go for WebSocket functions
-// (WASI P1 has no socket support, so WS falls back to the old path).
-func generateMainNative(dir, funcName, route string, port int) error {
-	replacer := strings.NewReplacer(
-		"{{FUNC}}", funcName,
-		"{{ROUTE}}", route,
-		"{{PORT}}", fmt.Sprintf("%d", port),
-	)
-	code := replacer.Replace(defaultGolangServerWS)
-	return os.WriteFile(filepath.Join(dir, "main.go"), []byte(code), 0o600)
-}
+// extractSDK writes the embedded drift-sdk source to a temporary directory
+// and returns its path. The caller must os.RemoveAll when done.
+func extractSDK() (string, error) {
+	tmpDir, err := os.MkdirTemp("", "drift-sdk-*")
+	if err != nil {
+		return "", err
+	}
 
+	entries, err := embeddedSDK.ReadDir("sdk")
+	if err != nil {
+		os.RemoveAll(tmpDir)
+		return "", err
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		data, err := embeddedSDK.ReadFile(filepath.Join("sdk", entry.Name()))
+		if err != nil {
+			os.RemoveAll(tmpDir)
+			return "", err
+		}
+		name := entry.Name()
+		// Restore go.mod.txt → go.mod
+		if name == "go.mod.txt" {
+			name = "go.mod"
+		}
+		if err := os.WriteFile(filepath.Join(tmpDir, name), data, 0o600); err != nil {
+			os.RemoveAll(tmpDir)
+			return "", err
+		}
+	}
+
+	return tmpDir, nil
+}
 
 // TriggerSpec is the minimal trigger definition declared in source comments.
 type TriggerSpec struct {
@@ -403,67 +429,62 @@ func DeployFolder(folder, element string) error {
 
 	var sourcePath, language string
 
-	// WebSocket functions fall back to native Go compilation (WASI P1 has no socket support).
-	if strings.ToLower(method) == "ws" {
-		language = "golang"
+	language = "wasm"
 
-		if err := generateMainNative(absFolder, funcName, "/"+name, 8080); err != nil {
-			return fmt.Errorf("failed to generate main.go: %w", err)
-		}
-		defer os.Remove(filepath.Join(absFolder, "main.go"))
-
-		command := exec.Command( // #nosec G204 — controlled go toolchain invocation
-			"go", "mod", "download",
-			fmt.Sprintf("-modfile=%s/go.mod", absFolder),
-		)
-		command.Dir = absFolder
-		if out, err := command.CombinedOutput(); err != nil {
-			fmt.Printf("Error running go mod download: %v\nOutput: %s\n", err, string(out))
-		}
-
-		command = exec.Command( // #nosec G204 — controlled go toolchain invocation
-			"go", "build",
-			"-ldflags", fmt.Sprintf("-X main.functionName=%s -X main.functionMethod=%s -X main.functionAuth=%s -X main.functionElement=%s", name, method, auth, element),
-			"-o", "app",
-		)
-		command.Dir = absFolder
-		command.Env = append(os.Environ(), "GOOS=linux")
-		if out, err := command.CombinedOutput(); err != nil {
-			return fmt.Errorf("go build error: %w\n%s", err, string(out))
-		}
-		defer os.Remove(filepath.Join(absFolder, "app"))
-
-		sourcePath = filepath.Join(absFolder, "app")
-	} else {
-		// POST/GET/PUT/DELETE — compile to WASM via drift SDK.
-		language = "wasm"
-
-		if err := generateMainWasm(absFolder, funcName, method); err != nil {
-			return fmt.Errorf("failed to generate main.go: %w", err)
-		}
-		defer os.Remove(filepath.Join(absFolder, "main.go"))
-
-		command := exec.Command( // #nosec G204 — controlled go toolchain invocation
-			"go", "mod", "download",
-			fmt.Sprintf("-modfile=%s/go.mod", absFolder),
-		)
-		command.Dir = absFolder
-		if out, err := command.CombinedOutput(); err != nil {
-			fmt.Printf("Error running go mod download: %v\nOutput: %s\n", err, string(out))
-		}
-
-		command = exec.Command( // #nosec G204 — controlled go toolchain invocation
-			"go", "build", "-o", "app.wasm",
-		)
-		command.Dir = absFolder
-		command.Env = append(os.Environ(), "GOOS=wasip1", "GOARCH=wasm")
-		if out, err := command.CombinedOutput(); err != nil {
-			return fmt.Errorf("go build error: %w\n%s", err, string(out))
-		}
-		defer os.Remove(filepath.Join(absFolder, "app.wasm"))
-
-		sourcePath = filepath.Join(absFolder, "app.wasm")
+	if err := generateMainWasm(absFolder, funcName, method); err != nil {
+		return fmt.Errorf("failed to generate main.go: %w", err)
 	}
+	defer os.Remove(filepath.Join(absFolder, "main.go"))
+
+	// Extract embedded drift-sdk to a temp dir and inject a replace directive
+	// so that `go build` can resolve the drift-sdk module.
+	sdkDir, err := extractSDK()
+	if err != nil {
+		return fmt.Errorf("failed to extract drift-sdk: %w", err)
+	}
+	defer os.RemoveAll(sdkDir)
+
+	// Save original go.mod/go.sum so we can restore them after the build.
+	origGoMod, _ := os.ReadFile(filepath.Join(absFolder, "go.mod"))
+	origGoSum, goSumErr := os.ReadFile(filepath.Join(absFolder, "go.sum"))
+	defer func() {
+		os.WriteFile(filepath.Join(absFolder, "go.mod"), origGoMod, 0o600)
+		if goSumErr == nil {
+			os.WriteFile(filepath.Join(absFolder, "go.sum"), origGoSum, 0o600)
+		} else {
+			os.Remove(filepath.Join(absFolder, "go.sum"))
+		}
+	}()
+
+	command := exec.Command( // #nosec G204 — controlled go toolchain invocation
+		"go", "mod", "edit",
+		fmt.Sprintf("-replace=drift-sdk@v0.0.0=%s", sdkDir),
+	)
+	command.Dir = absFolder
+	if out, err := command.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to inject sdk replace: %w\n%s", err, string(out))
+	}
+
+	command = exec.Command( // #nosec G204 — controlled go toolchain invocation
+		"go", "mod", "download",
+		fmt.Sprintf("-modfile=%s/go.mod", absFolder),
+	)
+	command.Dir = absFolder
+	if out, err := command.CombinedOutput(); err != nil {
+		fmt.Printf("Error running go mod download: %v\nOutput: %s\n", err, string(out))
+	}
+
+	command = exec.Command( // #nosec G204 — controlled go toolchain invocation
+		"go", "build", "-o", "app.wasm",
+	)
+	command.Dir = absFolder
+	command.Env = append(os.Environ(), "GOOS=wasip1", "GOARCH=wasm")
+	if out, err := command.CombinedOutput(); err != nil {
+		return fmt.Errorf("go build error: %w\n%s", err, string(out))
+	}
+	defer os.Remove(filepath.Join(absFolder, "app.wasm"))
+
+	sourcePath = filepath.Join(absFolder, "app.wasm")
 
 	if err := sendSourceToOperator(name, method, language, auth, element, sourcePath, envKeys, triggers); err != nil {
 		return err

@@ -19,10 +19,6 @@ var defaultGolangContentsPost string
 //go:embed languages/golang_get.txt
 var defaultGolangContentsGet string
 
-//go:embed languages/golang_ws.txt
-var defaultGolangContentsWS string
-
-
 func Go() *cobra.Command {
 	atomicNewCmd := &cobra.Command{
 		Use:                "new",
@@ -33,27 +29,15 @@ func Go() *cobra.Command {
 		SilenceErrors:      true,
 		Run: func(cmd *cobra.Command, args []string) {
 			auth := "none"
-			var endpointType, method, name string
+			var method, name string
 
-			// Endpoint type
-			typePrompt := &survey.Select{
-				Message: "What type of endpoint?",
-				Options: []string{"API Endpoint", "WebSocket Endpoint"},
+			// HTTP method
+			methodPrompt := &survey.Select{
+				Message: "Select HTTP method:",
+				Options: []string{"POST", "GET", "PUT", "DELETE"},
 				VimMode: true,
 			}
-			_ = survey.AskOne(typePrompt, &endpointType)
-
-			if endpointType == "WebSocket Endpoint" {
-				method = "ws"
-			} else {
-				// HTTP method
-				methodPrompt := &survey.Select{
-					Message: "Select HTTP method:",
-					Options: []string{"POST", "GET", "PUT", "DELETE"},
-					VimMode: true,
-				}
-				_ = survey.AskOne(methodPrompt, &method)
-			}
+			_ = survey.AskOne(methodPrompt, &method)
 
 			// Route name
 			namePrompt := &survey.Input{
@@ -100,46 +84,24 @@ func GenerateAtomicFunction(name, method, language, auth string) error {
 	mainFile := filepath.Join(name, fmt.Sprintf("%s.go", name))
 	dependenciesFile := filepath.Join(name, "go.mod")
 
-	// WASM functions depend on drift-sdk; WebSocket falls back to native.
-	var dependenciesFileContents string
+	replacer := strings.NewReplacer(
+		"{{NAME}}", name,
+		"{{METHOD_UPPER}}", common.CapitalizeFirst(strings.ToLower(method)),
+		"{{NAME_UPPER}}", common.CapitalizeFirst(strings.ToLower(name)),
+		"{{AUTH}}", auth,
+	)
 
 	switch strings.ToLower(method) {
 	case "post":
-		replacer := strings.NewReplacer(
-			"{{NAME}}", name,
-			"{{METHOD_UPPER}}", common.CapitalizeFirst(strings.ToLower(method)),
-			"{{NAME_UPPER}}", common.CapitalizeFirst(strings.ToLower(name)),
-			"{{AUTH}}", auth,
-		)
 		handler = replacer.Replace(defaultGolangContentsPost)
-		dependenciesFileContents = fmt.Sprintf(
-			"module atomic/%s\n\ngo 1.25\n\nrequire drift-sdk v0.0.0\n",
-			name,
-		)
 	case "get":
-		replacer := strings.NewReplacer(
-			"{{NAME}}", name,
-			"{{METHOD_UPPER}}", common.CapitalizeFirst(strings.ToLower(method)),
-			"{{NAME_UPPER}}", common.CapitalizeFirst(strings.ToLower(name)),
-			"{{AUTH}}", auth,
-		)
 		handler = replacer.Replace(defaultGolangContentsGet)
-		dependenciesFileContents = fmt.Sprintf(
-			"module atomic/%s\n\ngo 1.25\n\nrequire drift-sdk v0.0.0\n",
-			name,
-		)
-	case "ws":
-		replacer := strings.NewReplacer(
-			"{{NAME}}", name,
-			"{{NAME_UPPER}}", common.CapitalizeFirst(strings.ToLower(name)),
-			"{{AUTH}}", auth,
-		)
-		handler = replacer.Replace(defaultGolangContentsWS)
-		dependenciesFileContents = fmt.Sprintf(
-			"module atomic/%s\n\ngo 1.25\n\nrequire github.com/gorilla/websocket v1.5.3\n",
-			name,
-		)
 	}
+
+	dependenciesFileContents := fmt.Sprintf(
+		"module atomic/%s\n\ngo 1.25\n\nrequire drift-sdk v0.0.0\n",
+		name,
+	)
 
 	if err := os.MkdirAll(name, 0o750); err != nil {
 		return fmt.Errorf("failed to create function directory: %w", err)

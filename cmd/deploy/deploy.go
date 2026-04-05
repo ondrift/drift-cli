@@ -77,6 +77,10 @@ func GetDeployCmd() *cobra.Command {
 		GroupID: "services",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if _, err := common.RequireActiveSlice(); err != nil {
+				return err
+			}
+
 			manifestPath, err := filepath.Abs(args[0])
 			if err != nil {
 				return fmt.Errorf("failed to resolve manifest path: %w", err)

@@ -9,8 +9,12 @@ import (
 
 const SessionFile = "~/.drift/session.json"
 
+// APIBaseURL is the base URL for the Drift API gateway.
+const APIBaseURL = "http://api.localhost:30036"
+
 type Session struct {
-	Username string `json:"username"`
+	Username    string `json:"username"`
+	ActiveSlice string `json:"active_slice,omitempty"`
 }
 
 func expandPath(path string) (string, error) {
@@ -27,27 +31,14 @@ func expandPath(path string) (string, error) {
 }
 
 func SaveSession(token, refresh_token string) error {
-	path, err := expandPath(SessionFile)
-	if err != nil {
-		return err
+	// Read existing session to preserve active_slice across logins.
+	data, _ := readSessionMap()
+	if data == nil {
+		data = make(map[string]string)
 	}
-
-	// Make sure directory exists
-	err = os.MkdirAll(filepath.Dir(path), 0o700)
-	if err != nil {
-		return err
-	}
-
-	// Save token JSON
-	data := map[string]string{"token": token, "refresh_token": refresh_token}
-	f, err := os.Create(path) // #nosec G304 — CLI tool writes to user's own session file by design
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	enc := json.NewEncoder(f)
-	return enc.Encode(data)
+	data["token"] = token
+	data["refresh_token"] = refresh_token
+	return writeSessionMap(data)
 }
 
 func GetTokenFromSession() (token string, refreshToken string, err error) {
@@ -79,4 +70,68 @@ func GetTokenFromSession() (token string, refreshToken string, err error) {
 	}
 
 	return token, refreshToken, nil
+}
+
+// readSessionMap loads the raw session JSON as a string map.
+func readSessionMap() (map[string]string, error) {
+	path, err := expandPath(SessionFile)
+	if err != nil {
+		return nil, err
+	}
+	f, err := os.Open(path) // #nosec G304
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	data := make(map[string]string)
+	if err := json.NewDecoder(f).Decode(&data); err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+// writeSessionMap persists the raw session JSON.
+func writeSessionMap(data map[string]string) error {
+	path, err := expandPath(SessionFile)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	f, err := os.Create(path) // #nosec G304
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return json.NewEncoder(f).Encode(data)
+}
+
+// SaveActiveSlice persists the active slice name into the session file.
+func SaveActiveSlice(name string) error {
+	data, err := readSessionMap()
+	if err != nil {
+		return fmt.Errorf("no active session — log in first")
+	}
+	data["active_slice"] = name
+	return writeSessionMap(data)
+}
+
+// GetActiveSlice returns the active slice name, or empty string if none set.
+func GetActiveSlice() string {
+	data, err := readSessionMap()
+	if err != nil {
+		return ""
+	}
+	return data["active_slice"]
+}
+
+// RequireActiveSlice returns the active slice or an error instructing the user
+// to select one with "drift slice use <name>".
+func RequireActiveSlice() (string, error) {
+	s := GetActiveSlice()
+	if s == "" {
+		return "", fmt.Errorf("no active slice — run 'drift slice use <name>' or 'drift slice create <name>' first")
+	}
+	return s, nil
 }
