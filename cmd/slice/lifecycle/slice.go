@@ -15,6 +15,7 @@ func GetCmd() *cobra.Command {
 		getUseCmd(),
 		getDeleteCmd(),
 		getUpgradeCmd(),
+		getPlanCmd(),
 	)
 	return cmd
 }

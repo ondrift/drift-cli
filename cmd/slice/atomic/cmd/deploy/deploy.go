@@ -23,11 +23,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-//go:embed default/server_post_wasm.txt
-var defaultWasmServerPost string
+//go:embed default/server_post_native.txt
+var defaultNativeServerPost string
 
-//go:embed default/server_get_wasm.txt
-var defaultWasmServerGet string
+//go:embed default/server_get_native.txt
+var defaultNativeServerGet string
 
 // Embedded drift-sdk source — extracted to a temp dir at deploy time so that
 // `go mod edit -replace` can point the user's go.mod at it.
@@ -35,16 +35,16 @@ var defaultWasmServerGet string
 //go:embed sdk
 var embeddedSDK embed.FS
 
-// generateMainWasm writes a WASM-compatible main.go that wraps the user's
-// handler function using the drift SDK stdin/stdout protocol.
-func generateMainWasm(dir, funcName, method string) error {
+// generateMain writes a main.go that wraps the user's handler function
+// using the drift SDK stdin/stdout protocol.
+func generateMain(dir, funcName, method string) error {
 	var code string
 	replacer := strings.NewReplacer("{{FUNC}}", funcName)
 	switch method {
 	case "post":
-		code = replacer.Replace(defaultWasmServerPost)
+		code = replacer.Replace(defaultNativeServerPost)
 	case "get":
-		code = replacer.Replace(defaultWasmServerGet)
+		code = replacer.Replace(defaultNativeServerGet)
 	}
 	return os.WriteFile(filepath.Join(dir, "main.go"), []byte(code), 0o600)
 }
@@ -429,9 +429,9 @@ func DeployFolder(folder, element string) error {
 
 	var sourcePath, language string
 
-	language = "wasm"
+	language = "native"
 
-	if err := generateMainWasm(absFolder, funcName, method); err != nil {
+	if err := generateMain(absFolder, funcName, method); err != nil {
 		return fmt.Errorf("failed to generate main.go: %w", err)
 	}
 	defer os.Remove(filepath.Join(absFolder, "main.go"))
@@ -475,16 +475,16 @@ func DeployFolder(folder, element string) error {
 	}
 
 	command = exec.Command( // #nosec G204 — controlled go toolchain invocation
-		"go", "build", "-o", "app.wasm",
+		"go", "build", "-o", "app",
 	)
 	command.Dir = absFolder
-	command.Env = append(os.Environ(), "GOOS=wasip1", "GOARCH=wasm")
+	command.Env = append(os.Environ(), "GOOS=linux", "CGO_ENABLED=0")
 	if out, err := command.CombinedOutput(); err != nil {
 		return fmt.Errorf("go build error: %w\n%s", err, string(out))
 	}
-	defer os.Remove(filepath.Join(absFolder, "app.wasm"))
+	defer os.Remove(filepath.Join(absFolder, "app"))
 
-	sourcePath = filepath.Join(absFolder, "app.wasm")
+	sourcePath = filepath.Join(absFolder, "app")
 
 	if err := sendSourceToOperator(name, method, language, auth, element, sourcePath, envKeys, triggers); err != nil {
 		return err

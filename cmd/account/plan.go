@@ -42,8 +42,8 @@ type planManifest struct {
 	} `yaml:"backbone"`
 }
 
-// fetchUsage calls GET /ops/plan/usage and returns the parsed response.
-func fetchUsage() (usageResponse, error) {
+// FetchUsage calls GET /ops/plan/usage and returns the parsed response.
+func FetchUsage() (usageResponse, error) {
 	req, err := common.NewAuthenticatedRequest(http.MethodGet, "http://api.localhost:30036/ops/plan/usage", nil)
 	if err != nil {
 		return usageResponse{}, fmt.Errorf("not logged in: %w", err)
@@ -95,8 +95,8 @@ func planHeader(tierName string, costPerMonth int) string {
 	return fmt.Sprintf("%s plan  ·  €%d/mo", tierName, costPerMonth)
 }
 
-// printUsage is shared with GetAccountCmd.
-func printUsage(u usageResponse) {
+// PrintUsage is shared with GetAccountCmd.
+func PrintUsage(u usageResponse) {
 	fmt.Printf("\n📊  %s\n\n", planHeader(u.TierName, u.CostPerMonth))
 
 	type row struct {
@@ -134,10 +134,10 @@ func printUsage(u usageResponse) {
 	fmt.Println(div)
 	fmt.Println()
 	if len(atCapacity) > 0 {
-		fmt.Printf("    %s at capacity — run \"drift account upgrade prototyper\" for more room.\n",
+		fmt.Printf("    %s at capacity — run \"drift slice upgrade prototyper\" for more room.\n",
 			strings.Join(atCapacity, " and "))
 	}
-	fmt.Printf("    Tip: run \"drift plan drift.yaml\" to check a project before deploying.\n\n")
+	fmt.Printf("    Tip: run \"drift plan <drift.yaml>\" to check a project before deploying.\n\n")
 
 	if len(u.Limits) > 0 {
 		type capRow struct {
@@ -199,10 +199,10 @@ func GetPlanCmd() *cobra.Command {
 resources this project will consume, whether they fit within your current
 plan limits, and what headroom remains after the deploy.
 
-To see your current plan and usage, run: drift account`,
+To see your current plan and usage, run: drift slice plan`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			usage, err := fetchUsage()
+			usage, err := FetchUsage()
 			if err != nil {
 				return err
 			}
@@ -293,7 +293,7 @@ func printFlightPlan(m planManifest, u usageResponse, manifestPath string) {
 			noun = "resources"
 		}
 		fmt.Printf("    ❌  %d %s would exceed your %s plan quota.\n", issues, noun, u.TierName)
-		fmt.Printf("        Upgrade: drift account upgrade prototyper\n\n")
+		fmt.Printf("        Upgrade: drift slice upgrade prototyper\n\n")
 	case warnings > 0:
 		fmt.Printf("    ⚠️   Some resources will be at capacity after this deployment.\n")
 		fmt.Printf("        Ready to go — run \"drift deploy %s\" when you're ready.\n\n", manifestPath)
