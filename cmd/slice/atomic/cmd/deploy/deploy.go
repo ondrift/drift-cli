@@ -3,7 +3,7 @@ package atomic_cmd
 import (
 	"bufio"
 	"bytes"
-	"embed"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -29,12 +29,6 @@ var defaultNativeServerPost string
 //go:embed default/server_get_native.txt
 var defaultNativeServerGet string
 
-// Embedded drift-sdk source — extracted to a temp dir at deploy time so that
-// `go mod edit -replace` can point the user's go.mod at it.
-//
-//go:embed sdk
-var embeddedSDK embed.FS
-
 // generateMain writes a main.go that wraps the user's handler function
 // using the drift SDK stdin/stdout protocol.
 func generateMain(dir, funcName, method string) error {
@@ -47,43 +41,6 @@ func generateMain(dir, funcName, method string) error {
 		code = replacer.Replace(defaultNativeServerGet)
 	}
 	return os.WriteFile(filepath.Join(dir, "main.go"), []byte(code), 0o600)
-}
-
-// extractSDK writes the embedded drift-sdk source to a temporary directory
-// and returns its path. The caller must os.RemoveAll when done.
-func extractSDK() (string, error) {
-	tmpDir, err := os.MkdirTemp("", "drift-sdk-*")
-	if err != nil {
-		return "", err
-	}
-
-	entries, err := embeddedSDK.ReadDir("sdk")
-	if err != nil {
-		os.RemoveAll(tmpDir)
-		return "", err
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		data, err := embeddedSDK.ReadFile(filepath.Join("sdk", entry.Name()))
-		if err != nil {
-			os.RemoveAll(tmpDir)
-			return "", err
-		}
-		name := entry.Name()
-		// Restore go.mod.txt → go.mod
-		if name == "go.mod.txt" {
-			name = "go.mod"
-		}
-		if err := os.WriteFile(filepath.Join(tmpDir, name), data, 0o600); err != nil {
-			os.RemoveAll(tmpDir)
-			return "", err
-		}
-	}
-
-	return tmpDir, nil
 }
 
 // TriggerSpec is the minimal trigger definition declared in source comments.
@@ -375,16 +332,20 @@ func sendSourceToOperator(name, method, language, auth, element, sourcePath stri
 
 // DeployFolder builds and deploys the atomic function at folder. It is
 // exported so that "drift deploy" can call it directly without going through
-// the cobra command layer.
-func DeployFolder(folder, element string) error {
+// the cobra command layer. When quiet is true, all per-function status
+// chatter is suppressed so the manifest deploy can render its own clean
+// summary line for each function.
+func DeployFolder(folder, element string, quiet bool) error {
 	method, name, auth, err := atomic_common.ParseAtomicMetadataFromDir(folder)
 	if err != nil {
 		return fmt.Errorf("failed to parse Atomic metadata: %w", err)
 	}
-	if element != "" {
-		fmt.Printf("🚀 Deploying function '%s /%s/%s' (auth: %s, element: %s)\n", method, element, name, auth, element)
-	} else {
-		fmt.Printf("🚀 Deploying function '%s /%s' (auth: %s)\n", method, name, auth)
+	if !quiet {
+		if element != "" {
+			fmt.Printf("🚀 Deploying function '%s /%s/%s' (auth: %s, element: %s)\n", method, element, name, auth, element)
+		} else {
+			fmt.Printf("🚀 Deploying function '%s /%s' (auth: %s)\n", method, name, auth)
+		}
 	}
 
 	envKeys, err := syncEnvToBackbone(folder)
@@ -401,7 +362,7 @@ func DeployFolder(folder, element string) error {
 		return fmt.Errorf("failed to parse schedule comments: %w", err)
 	}
 	triggers = append(triggers, schedules...)
-	if len(triggers) > 0 {
+	if len(triggers) > 0 && !quiet {
 		fmt.Printf("⚡ %d trigger(s) found: ", len(triggers))
 		for i, t := range triggers {
 			if i > 0 {
@@ -436,19 +397,14 @@ func DeployFolder(folder, element string) error {
 	}
 	defer os.Remove(filepath.Join(absFolder, "main.go"))
 
-	// Extract embedded drift-sdk to a temp dir and inject a replace directive
-	// so that `go build` can resolve the drift-sdk module.
-	sdkDir, err := extractSDK()
-	if err != nil {
-		return fmt.Errorf("failed to extract drift-sdk: %w", err)
-	}
-	defer os.RemoveAll(sdkDir)
-
-	// Save original go.mod/go.sum so we can restore them after the build.
+	// Back up go.mod/go.sum so `go mod tidy` (which can rewrite both to add
+	// transitive requires) doesn't dirty the user's working tree.
 	origGoMod, _ := os.ReadFile(filepath.Join(absFolder, "go.mod"))
 	origGoSum, goSumErr := os.ReadFile(filepath.Join(absFolder, "go.sum"))
 	defer func() {
-		os.WriteFile(filepath.Join(absFolder, "go.mod"), origGoMod, 0o600)
+		if origGoMod != nil {
+			os.WriteFile(filepath.Join(absFolder, "go.mod"), origGoMod, 0o600)
+		}
 		if goSumErr == nil {
 			os.WriteFile(filepath.Join(absFolder, "go.sum"), origGoSum, 0o600)
 		} else {
@@ -456,22 +412,12 @@ func DeployFolder(folder, element string) error {
 		}
 	}()
 
-	command := exec.Command( // #nosec G204 — controlled go toolchain invocation
-		"go", "mod", "edit",
-		fmt.Sprintf("-replace=drift-sdk@v0.0.0=%s", sdkDir),
-	)
+	// Resolve the drift-sdk (and any other) module dependencies declared in
+	// the function's go.mod. This pulls them from the public module proxy.
+	command := exec.Command("go", "mod", "tidy") // #nosec G204 — controlled go toolchain invocation
 	command.Dir = absFolder
 	if out, err := command.CombinedOutput(); err != nil {
-		return fmt.Errorf("failed to inject sdk replace: %w\n%s", err, string(out))
-	}
-
-	command = exec.Command( // #nosec G204 — controlled go toolchain invocation
-		"go", "mod", "download",
-		fmt.Sprintf("-modfile=%s/go.mod", absFolder),
-	)
-	command.Dir = absFolder
-	if out, err := command.CombinedOutput(); err != nil {
-		fmt.Printf("Error running go mod download: %v\nOutput: %s\n", err, string(out))
+		return fmt.Errorf("go mod tidy error: %w\n%s", err, string(out))
 	}
 
 	command = exec.Command( // #nosec G204 — controlled go toolchain invocation
@@ -490,7 +436,9 @@ func DeployFolder(folder, element string) error {
 		return err
 	}
 
-	fmt.Printf("✅ Function '%s /%s' deployed successfully!\n", method, name)
+	if !quiet {
+		fmt.Printf("✅ Function '%s /%s' deployed successfully!\n", method, name)
+	}
 	return nil
 }
 
@@ -503,7 +451,7 @@ func Deploy() *cobra.Command {
 		GroupID: "operations",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return DeployFolder(args[0], element)
+			return DeployFolder(args[0], element, false)
 		},
 	}
 

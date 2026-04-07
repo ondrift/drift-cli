@@ -11,6 +11,7 @@ import (
 	"time"
 
 	atomic_cmd "cli/cmd/slice/atomic/cmd/deploy"
+	atomic_common "cli/cmd/slice/atomic/common"
 	"cli/common"
 
 	"github.com/spf13/cobra"
@@ -98,35 +99,28 @@ func GetDeployCmd() *cobra.Command {
 
 			baseDir := filepath.Dir(manifestPath)
 			client := &http.Client{Timeout: 30 * time.Second}
+			start := time.Now()
 
-			fmt.Printf("🚀 Deploying \"%s\"\n\n", m.Name)
-
-			// ── Canvas ──────────────────────────────────────────────────────
-			if len(m.Canvas) > 0 {
-				fmt.Println("📦 Canvas")
-				for _, entry := range m.Canvas {
-					dir := resolve(baseDir, entry.Dir)
-					site := entry.Site
-					if site == "" {
-						site = "default"
-					}
-					fmt.Printf("  → site %q from %s\n", site, entry.Dir)
-					if err := deployCanvas(client, dir, site); err != nil {
-						return fmt.Errorf("canvas deploy failed for %s: %w", entry.Dir, err)
-					}
-					fmt.Printf("  ✅ site %q deployed\n", site)
-				}
-				fmt.Println()
-			}
+			fmt.Printf("\n  Deploying %s...\n\n", common.Highlight(m.Name))
 
 			// ── Atomic ──────────────────────────────────────────────────────
 			if len(m.Atomic) > 0 {
-				fmt.Println("⚡ Atomic")
+				fmt.Printf("  %s\n", common.AtomicHeader())
 				for _, entry := range m.Atomic {
 					dir := resolve(baseDir, entry.Dir)
-					if err := atomic_cmd.DeployFolder(dir, entry.Element); err != nil {
+					// Resolve the canonical function name up-front so the
+					// spinner can show it before the build starts.
+					_, fnName, _, metaErr := atomic_common.ParseAtomicMetadataFromDir(dir)
+					if metaErr != nil || fnName == "" {
+						fnName = filepath.Base(entry.Dir)
+					}
+					sp := common.StartSpinner("    ", fnName)
+					err := atomic_cmd.DeployFolder(dir, entry.Element, true)
+					sp.Stop()
+					if err != nil {
 						return fmt.Errorf("atomic deploy failed for %s: %w", entry.Dir, err)
 					}
+					fmt.Printf("    %s %s\n", common.Check(), fnName)
 				}
 				fmt.Println()
 			}
@@ -135,13 +129,16 @@ func GetDeployCmd() *cobra.Command {
 			bb := m.Backbone
 			hasBackbone := len(bb.Cache)+len(bb.NoSQL)+len(bb.Queues)+len(bb.Secrets) > 0
 			if hasBackbone {
-				fmt.Println("🔧 Backbone")
+				fmt.Printf("  %s\n", common.BackboneHeader())
 
 				for _, entry := range bb.Cache {
+					label := fmt.Sprintf("Cache: %s", entry.Key)
+					sp := common.StartSpinner("    ", label)
 					var value string
 					if entry.File != "" {
 						raw, err := os.ReadFile(resolve(baseDir, entry.File)) // #nosec G304
 						if err != nil {
+							sp.Stop()
 							return fmt.Errorf("failed to read cache file %s: %w", entry.File, err)
 						}
 						value = string(raw)
@@ -149,44 +146,92 @@ func GetDeployCmd() *cobra.Command {
 						value = entry.Value
 					}
 					if err := cacheSet(client, entry.Key, value, entry.TTL); err != nil {
+						sp.Stop()
 						return fmt.Errorf("cache set %q failed: %w", entry.Key, err)
 					}
-					fmt.Printf("  ✅ cache %q seeded\n", entry.Key)
+					sp.Stop()
+					line := fmt.Sprintf("    %s %s", common.Check(), label)
+					if entry.File != "" {
+						line += " " + common.Hint(fmt.Sprintf("(seeded from %s)", filepath.Base(entry.File)))
+					}
+					fmt.Println(line)
 				}
 
 				for _, entry := range bb.NoSQL {
+					label := fmt.Sprintf("NoSQL: %s", entry.Collection)
+					sp := common.StartSpinner("    ", label)
 					if err := nosqlInit(client, entry.Collection); err != nil {
+						sp.Stop()
 						return fmt.Errorf("nosql init %q failed: %w", entry.Collection, err)
 					}
-					fmt.Printf("  ✅ collection %q ready\n", entry.Collection)
+					sp.Stop()
+					fmt.Printf("    %s %s\n", common.Check(), label)
 				}
 
 				for _, entry := range bb.Queues {
+					label := fmt.Sprintf("Queue: %s", entry.Name)
+					sp := common.StartSpinner("    ", label)
 					if err := queueInit(client, entry.Name); err != nil {
+						sp.Stop()
 						return fmt.Errorf("queue init %q failed: %w", entry.Name, err)
 					}
-					fmt.Printf("  ✅ queue %q ready\n", entry.Name)
+					sp.Stop()
+					fmt.Printf("    %s %s\n", common.Check(), label)
 				}
 
-				for _, entry := range bb.Secrets {
-					value := entry.Value
-					if entry.Env != "" {
-						value = os.Getenv(entry.Env)
-						if value == "" {
-							fmt.Printf("  ⚠️  secret %q: env var %s is not set, skipping\n", entry.Key, entry.Env)
-							continue
+				if len(bb.Secrets) > 0 {
+					sp := common.StartSpinner("    ", "Secrets: injecting…")
+					injected := 0
+					var skipped []string
+					for _, entry := range bb.Secrets {
+						value := entry.Value
+						if entry.Env != "" {
+							value = os.Getenv(entry.Env)
+							if value == "" {
+								skipped = append(skipped, fmt.Sprintf("%s (env %s unset)", entry.Key, entry.Env))
+								continue
+							}
 						}
+						if err := secretSet(client, entry.Key, value); err != nil {
+							sp.Stop()
+							return fmt.Errorf("secret set %q failed: %w", entry.Key, err)
+						}
+						injected++
 					}
-					if err := secretSet(client, entry.Key, value); err != nil {
-						return fmt.Errorf("secret set %q failed: %w", entry.Key, err)
+					sp.Stop()
+					if injected > 0 {
+						fmt.Printf("    %s Secrets: %d injected\n", common.Check(), injected)
 					}
-					fmt.Printf("  ✅ secret %q stored\n", entry.Key)
+					for _, msg := range skipped {
+						fmt.Printf("    %s Secret %s\n", common.Hint("!"), msg)
+					}
 				}
 
 				fmt.Println()
 			}
 
-			fmt.Printf("✅ \"%s\" deployed successfully!\n", m.Name)
+			// ── Canvas ──────────────────────────────────────────────────────
+			if len(m.Canvas) > 0 {
+				fmt.Printf("  %s\n", common.CanvasHeader())
+				for _, entry := range m.Canvas {
+					dir := resolve(baseDir, entry.Dir)
+					site := entry.Site
+					if site == "" {
+						site = "default"
+					}
+					sp := common.StartSpinner("    ", site)
+					if err := deployCanvas(client, dir, site); err != nil {
+						sp.Stop()
+						return fmt.Errorf("canvas deploy failed for %s: %w", entry.Dir, err)
+					}
+					sp.Stop()
+					fmt.Printf("    %s %s\n", common.Check(), site)
+				}
+				fmt.Println()
+			}
+
+			elapsed := time.Since(start).Seconds()
+			fmt.Printf("  %s\n\n", common.Hint(fmt.Sprintf("Done in %.1fs 🚀", elapsed)))
 			return nil
 		},
 	}

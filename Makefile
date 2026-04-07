@@ -72,17 +72,9 @@ scan: vuln gosec
 # Build
 # ---------------------------------------------------------------------------
 
-SDK_SRC   := ../drift-sdk
-SDK_DEST  := cmd/slice/atomic/cmd/deploy/sdk
+.PHONY: build install
 
-.PHONY: sync-sdk build install
-
-sync-sdk:
-	@mkdir -p $(SDK_DEST)
-	@cp $(SDK_SRC)/*.go $(SDK_DEST)/
-	@cp $(SDK_SRC)/go.mod $(SDK_DEST)/go.mod.txt
-
-build: sync-sdk
+build:
 	go build -ldflags="-s -w -X main.version=$(VERSION)" -o drift .
 
 install: build
