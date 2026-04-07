@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 
 	"cli/common"
 
@@ -32,19 +31,11 @@ func lockAcquireCmd() *cobra.Command {
 			name, owner := args[0], args[1]
 
 			payload, _ := json.Marshal(map[string]any{"name": name, "owner": owner, "ttl": ttl})
-			req, err := common.NewAuthenticatedRequest(
+			resp, err := common.DoJSONRequest(
 				http.MethodPost,
-				"http://api.localhost:30036/ops/backbone/lock/acquire",
+				common.APIBaseURL+"/ops/backbone/lock/acquire",
 				bytes.NewBuffer(payload),
 			)
-			if err != nil {
-				fmt.Println("❌ Not logged in:", err)
-				return
-			}
-			req.Header.Set("Content-Type", "application/json")
-
-			client := &http.Client{Timeout: 10 * time.Second}
-			resp, err := client.Do(req)
 			if err != nil {
 				fmt.Println("❌ Failed to contact API:", err)
 				return
@@ -77,19 +68,11 @@ func lockReleaseCmd() *cobra.Command {
 			name, owner := args[0], args[1]
 
 			payload, _ := json.Marshal(map[string]any{"name": name, "owner": owner})
-			req, err := common.NewAuthenticatedRequest(
+			resp, err := common.DoJSONRequest(
 				http.MethodPost,
-				"http://api.localhost:30036/ops/backbone/lock/release",
+				common.APIBaseURL+"/ops/backbone/lock/release",
 				bytes.NewBuffer(payload),
 			)
-			if err != nil {
-				fmt.Println("❌ Not logged in:", err)
-				return
-			}
-			req.Header.Set("Content-Type", "application/json")
-
-			client := &http.Client{Timeout: 10 * time.Second}
-			resp, err := client.Do(req)
 			if err != nil {
 				fmt.Println("❌ Failed to contact API:", err)
 				return
@@ -117,19 +100,11 @@ func lockRenewCmd() *cobra.Command {
 			name, owner := args[0], args[1]
 
 			payload, _ := json.Marshal(map[string]any{"name": name, "owner": owner, "ttl": ttl})
-			req, err := common.NewAuthenticatedRequest(
+			resp, err := common.DoJSONRequest(
 				http.MethodPost,
-				"http://api.localhost:30036/ops/backbone/lock/renew",
+				common.APIBaseURL+"/ops/backbone/lock/renew",
 				bytes.NewBuffer(payload),
 			)
-			if err != nil {
-				fmt.Println("❌ Not logged in:", err)
-				return
-			}
-			req.Header.Set("Content-Type", "application/json")
-
-			client := &http.Client{Timeout: 10 * time.Second}
-			resp, err := client.Do(req)
 			if err != nil {
 				fmt.Println("❌ Failed to contact API:", err)
 				return

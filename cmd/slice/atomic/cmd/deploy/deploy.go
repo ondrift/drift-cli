@@ -194,12 +194,7 @@ func syncEnvToBackbone(folder string) ([]string, error) {
 	}
 
 	// Fetch existing Backbone secret names.
-	listReq, err := common.NewAuthenticatedRequest(http.MethodGet, "http://api.localhost:30036/ops/backbone/secret/list", nil)
-	if err != nil {
-		return nil, fmt.Errorf("not logged in: %w", err)
-	}
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(listReq)
+	resp, err := common.DoRequest(http.MethodGet, common.APIBaseURL+"/ops/backbone/secret/list", nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not reach API: %w", err)
 	}
@@ -232,12 +227,7 @@ func syncEnvToBackbone(folder string) ([]string, error) {
 		if answer == "" || answer == "y" || answer == "yes" {
 			for _, k := range missing {
 				body, _ := json.Marshal(map[string]string{"name": k, "value": pairs[k]})
-				req, err := common.NewAuthenticatedRequest(http.MethodPost, "http://api.localhost:30036/ops/backbone/secret/set", bytes.NewBuffer(body))
-				if err != nil {
-					return nil, fmt.Errorf("not logged in: %w", err)
-				}
-				req.Header.Set("Content-Type", "application/json")
-				r, err := client.Do(req)
+				r, err := common.DoJSONRequest(http.MethodPost, common.APIBaseURL+"/ops/backbone/secret/set", bytes.NewBuffer(body))
 				if err != nil {
 					fmt.Printf("   ❌ Failed to push %s: %v\n", k, err)
 					continue
@@ -260,8 +250,10 @@ func syncEnvToBackbone(folder string) ([]string, error) {
 	return keys, nil
 }
 
-// sendSourceToOperator streams the compiled binary/zip to the API as
-// multipart/form-data — no base64 encoding, no heap-resident copy of the file.
+// sendSourceToOperator uploads the compiled binary to the API as
+// multipart/form-data. The whole payload is buffered (typical Go binaries
+// are ~10–30 MB) so the request body can be replayed if the auto-refresh
+// path needs to retry after a 401.
 func sendSourceToOperator(name, method, language, auth, element, sourcePath string, envKeys []string, triggers []TriggerSpec) error {
 	meta, err := json.Marshal(map[string]any{
 		"name":     name,
@@ -282,41 +274,32 @@ func sendSourceToOperator(name, method, language, auth, element, sourcePath stri
 	}
 	defer f.Close()
 
-	pr, pw := io.Pipe()
-	mw := multipart.NewWriter(pw)
-
-	go func() {
-		metaPart, err := mw.CreateFormField("metadata")
-		if err != nil {
-			pw.CloseWithError(err)
-			return
-		}
-		if _, err := metaPart.Write(meta); err != nil {
-			pw.CloseWithError(err)
-			return
-		}
-		srcPart, err := mw.CreateFormFile("source", filepath.Base(sourcePath))
-		if err != nil {
-			pw.CloseWithError(err)
-			return
-		}
-		if _, err := io.Copy(srcPart, f); err != nil {
-			pw.CloseWithError(err)
-			return
-		}
-		mw.Close()
-		pw.Close()
-	}()
-
-	req, err := common.NewAuthenticatedRequest("POST", "http://api.localhost:30036/ops/atomic", pr)
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	metaPart, err := mw.CreateFormField("metadata")
 	if err != nil {
-		pw.CloseWithError(err)
-		return fmt.Errorf("failed to create request: %w", err)
+		return fmt.Errorf("failed to create metadata field: %w", err)
 	}
-	req.Header.Set("Content-Type", mw.FormDataContentType())
+	if _, err := metaPart.Write(meta); err != nil {
+		return fmt.Errorf("failed to write metadata: %w", err)
+	}
+	srcPart, err := mw.CreateFormFile("source", filepath.Base(sourcePath))
+	if err != nil {
+		return fmt.Errorf("failed to create source field: %w", err)
+	}
+	if _, err := io.Copy(srcPart, f); err != nil {
+		return fmt.Errorf("failed to buffer source: %w", err)
+	}
+	if err := mw.Close(); err != nil {
+		return fmt.Errorf("failed to finalize multipart: %w", err)
+	}
 
-	client := &http.Client{Timeout: 120 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := common.DoRequestWithContentType(
+		http.MethodPost,
+		common.APIBaseURL+"/ops/atomic",
+		mw.FormDataContentType(),
+		&buf,
+	)
 	if err != nil {
 		return fmt.Errorf("upload failed: %w", err)
 	}

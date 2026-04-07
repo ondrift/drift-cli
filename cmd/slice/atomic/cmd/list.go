@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"sort"
-	"time"
 
 	"cli/common"
 
@@ -24,17 +23,11 @@ type atomicRecord struct {
 }
 
 func fetchDeployedFunctions() ([]atomicRecord, error) {
-	req, err := common.NewAuthenticatedRequest(
+	resp, err := common.DoRequest(
 		http.MethodGet,
-		"http://api.localhost:30036/ops/atomic/list",
+		common.APIBaseURL+"/ops/atomic/list",
 		nil,
 	)
-	if err != nil {
-		return nil, fmt.Errorf("not logged in: %w", err)
-	}
-
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to contact API: %w", err)
 	}

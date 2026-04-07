@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 
 	"cli/common"
 
@@ -23,17 +22,11 @@ func getListCmd() *cobra.Command {
 		Short: "List all your slices",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			req, err := common.NewAuthenticatedRequest(
+			resp, err := common.DoRequest(
 				http.MethodGet,
-				"http://api.localhost:30036/ops/slice/list",
+				common.APIBaseURL+"/ops/slice/list",
 				nil,
 			)
-			if err != nil {
-				return fmt.Errorf("not logged in: %w", err)
-			}
-
-			client := &http.Client{Timeout: 30 * time.Second}
-			resp, err := client.Do(req)
 			if err != nil {
 				return fmt.Errorf("failed to contact API: %w", err)
 			}

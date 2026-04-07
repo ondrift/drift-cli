@@ -63,7 +63,7 @@ func GetSignupCmd() *cobra.Command {
 			})
 
 			client := &http.Client{Timeout: 30 * time.Second}
-			resp, err := client.Post("http://api.localhost:30036/signup/initiate", "application/json", bytes.NewBuffer(initiatePayload))
+			resp, err := client.Post(common.APIBaseURL+"/signup/initiate", "application/json", bytes.NewBuffer(initiatePayload))
 			if err != nil {
 				log.Fatalf("request failed: %v", err)
 			}
@@ -97,7 +97,7 @@ func GetSignupCmd() *cobra.Command {
 				"code":     code,
 			})
 
-			resp, err = client.Post("http://api.localhost:30036/signup/verify", "application/json", bytes.NewBuffer(verifyPayload))
+			resp, err = client.Post(common.APIBaseURL+"/signup/verify", "application/json", bytes.NewBuffer(verifyPayload))
 			if err != nil {
 				log.Fatalf("verify request failed: %v", err)
 			}

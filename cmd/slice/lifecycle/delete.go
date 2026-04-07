@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 
 	"cli/common"
 
@@ -25,18 +24,11 @@ func getDeleteCmd() *cobra.Command {
 				return
 			}
 
-			req, err := common.NewAuthenticatedRequest(
+			resp, err := common.DoRequest(
 				http.MethodDelete,
-				"http://api.localhost:30036/ops/slice/delete?name="+name,
+				common.APIBaseURL+"/ops/slice/delete?name="+name,
 				nil,
 			)
-			if err != nil {
-				fmt.Println("Not logged in:", err)
-				return
-			}
-
-			client := &http.Client{Timeout: 120 * time.Second}
-			resp, err := client.Do(req)
 			if err != nil {
 				fmt.Println("Failed to contact API:", err)
 				return

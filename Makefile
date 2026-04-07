@@ -71,11 +71,23 @@ scan: vuln gosec
 # ---------------------------------------------------------------------------
 # Build
 # ---------------------------------------------------------------------------
+#
+# API_URL is injected at build time via -ldflags. The default is the local
+# dev cluster; `make build-prod` points at https://api.ondrift.eu. Users who
+# run their own hosted Drift can override with `make build API_URL=https://...`.
 
-.PHONY: build install
+API_URL ?= http://api.localhost:30036
+
+.PHONY: build build-local build-prod install
 
 build:
-	go build -ldflags="-s -w -X main.version=$(VERSION)" -o drift .
+	go build -ldflags="-s -w -X main.version=$(VERSION) -X cli/common.APIBaseURL=$(API_URL)" -o drift .
+
+build-local:
+	$(MAKE) build API_URL=http://api.localhost:30036
+
+build-prod:
+	$(MAKE) build API_URL=https://api.ondrift.eu
 
 install: build
 	install -m 0755 drift /usr/local/bin/drift

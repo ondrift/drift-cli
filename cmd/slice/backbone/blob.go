@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"time"
 
 	"cli/common"
 
@@ -37,16 +36,8 @@ func blobPutCmd() *cobra.Command {
 			}
 			defer f.Close()
 
-			url := fmt.Sprintf("http://api.localhost:30036/ops/backbone/blob/put?bucket=%s&key=%s", bucket, key)
-			req, err := common.NewAuthenticatedRequest(http.MethodPost, url, f)
-			if err != nil {
-				fmt.Println("❌ Not logged in:", err)
-				return
-			}
-			req.Header.Set("Content-Type", "application/octet-stream")
-
-			client := &http.Client{Timeout: 30 * time.Second}
-			resp, err := client.Do(req)
+			url := fmt.Sprintf("%s/ops/backbone/blob/put?bucket=%s&key=%s", common.APIBaseURL, bucket, key)
+			resp, err := common.DoRequestWithContentType(http.MethodPost, url, "application/octet-stream", f)
 			if err != nil {
 				fmt.Println("❌ Failed to contact API:", err)
 				return
@@ -72,15 +63,8 @@ func blobGetCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			bucket, key := args[0], args[1]
 
-			url := fmt.Sprintf("http://api.localhost:30036/ops/backbone/blob/get?bucket=%s&key=%s", bucket, key)
-			req, err := common.NewAuthenticatedRequest(http.MethodGet, url, nil)
-			if err != nil {
-				fmt.Println("❌ Not logged in:", err)
-				return
-			}
-
-			client := &http.Client{Timeout: 30 * time.Second}
-			resp, err := client.Do(req)
+			url := fmt.Sprintf("%s/ops/backbone/blob/get?bucket=%s&key=%s", common.APIBaseURL, bucket, key)
+			resp, err := common.DoRequest(http.MethodGet, url, nil)
 			if err != nil {
 				fmt.Println("❌ Failed to contact API:", err)
 				return
@@ -110,15 +94,8 @@ func blobListCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			bucket := args[0]
 
-			url := fmt.Sprintf("http://api.localhost:30036/ops/backbone/blob/list?bucket=%s", bucket)
-			req, err := common.NewAuthenticatedRequest(http.MethodGet, url, nil)
-			if err != nil {
-				fmt.Println("❌ Not logged in:", err)
-				return
-			}
-
-			client := &http.Client{Timeout: 10 * time.Second}
-			resp, err := client.Do(req)
+			url := fmt.Sprintf("%s/ops/backbone/blob/list?bucket=%s", common.APIBaseURL, bucket)
+			resp, err := common.DoRequest(http.MethodGet, url, nil)
 			if err != nil {
 				fmt.Println("❌ Failed to contact API:", err)
 				return
@@ -151,15 +128,8 @@ func blobDeleteCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			bucket, key := args[0], args[1]
 
-			url := fmt.Sprintf("http://api.localhost:30036/ops/backbone/blob/delete?bucket=%s&key=%s", bucket, key)
-			req, err := common.NewAuthenticatedRequest(http.MethodPost, url, nil)
-			if err != nil {
-				fmt.Println("❌ Not logged in:", err)
-				return
-			}
-
-			client := &http.Client{Timeout: 10 * time.Second}
-			resp, err := client.Do(req)
+			url := fmt.Sprintf("%s/ops/backbone/blob/delete?bucket=%s&key=%s", common.APIBaseURL, bucket, key)
+			resp, err := common.DoRequest(http.MethodPost, url, nil)
 			if err != nil {
 				fmt.Println("❌ Failed to contact API:", err)
 				return

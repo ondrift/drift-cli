@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 
 	"cli/common"
 
@@ -37,19 +36,11 @@ func queuePushCmd() *cobra.Command {
 			}
 
 			payload, _ := json.Marshal(map[string]any{"queue": name, "body": body})
-			req, err := common.NewAuthenticatedRequest(
+			resp, err := common.DoJSONRequest(
 				http.MethodPost,
-				"http://api.localhost:30036/ops/backbone/queue/push",
+				common.APIBaseURL+"/ops/backbone/queue/push",
 				bytes.NewBuffer(payload),
 			)
-			if err != nil {
-				fmt.Println("❌ Not logged in:", err)
-				return
-			}
-			req.Header.Set("Content-Type", "application/json")
-
-			client := &http.Client{Timeout: 10 * time.Second}
-			resp, err := client.Do(req)
 			if err != nil {
 				fmt.Println("❌ Failed to contact API:", err)
 				return
@@ -80,15 +71,8 @@ func queuePopCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			name := args[0]
 
-			url := fmt.Sprintf("http://api.localhost:30036/ops/backbone/queue/pop?queue=%s", name)
-			req, err := common.NewAuthenticatedRequest(http.MethodPost, url, nil)
-			if err != nil {
-				fmt.Println("❌ Not logged in:", err)
-				return
-			}
-
-			client := &http.Client{Timeout: 10 * time.Second}
-			resp, err := client.Do(req)
+			url := fmt.Sprintf("%s/ops/backbone/queue/pop?queue=%s", common.APIBaseURL, name)
+			resp, err := common.DoRequest(http.MethodPost, url, nil)
 			if err != nil {
 				fmt.Println("❌ Failed to contact API:", err)
 				return
@@ -119,15 +103,8 @@ func queuePeekCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			name := args[0]
 
-			url := fmt.Sprintf("http://api.localhost:30036/ops/backbone/queue/peek?queue=%s", name)
-			req, err := common.NewAuthenticatedRequest(http.MethodGet, url, nil)
-			if err != nil {
-				fmt.Println("❌ Not logged in:", err)
-				return
-			}
-
-			client := &http.Client{Timeout: 10 * time.Second}
-			resp, err := client.Do(req)
+			url := fmt.Sprintf("%s/ops/backbone/queue/peek?queue=%s", common.APIBaseURL, name)
+			resp, err := common.DoRequest(http.MethodGet, url, nil)
 			if err != nil {
 				fmt.Println("❌ Failed to contact API:", err)
 				return
@@ -158,15 +135,8 @@ func queueDropCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			name := args[0]
 
-			url := fmt.Sprintf("http://api.localhost:30036/ops/backbone/queue/drop?queue=%s", name)
-			req, err := common.NewAuthenticatedRequest(http.MethodPost, url, nil)
-			if err != nil {
-				fmt.Println("❌ Not logged in:", err)
-				return
-			}
-
-			client := &http.Client{Timeout: 10 * time.Second}
-			resp, err := client.Do(req)
+			url := fmt.Sprintf("%s/ops/backbone/queue/drop?queue=%s", common.APIBaseURL, name)
+			resp, err := common.DoRequest(http.MethodPost, url, nil)
 			if err != nil {
 				fmt.Println("❌ Failed to contact API:", err)
 				return
@@ -191,15 +161,8 @@ func queueLenCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			name := args[0]
 
-			url := fmt.Sprintf("http://api.localhost:30036/ops/backbone/queue/len?queue=%s", name)
-			req, err := common.NewAuthenticatedRequest(http.MethodGet, url, nil)
-			if err != nil {
-				fmt.Println("❌ Not logged in:", err)
-				return
-			}
-
-			client := &http.Client{Timeout: 10 * time.Second}
-			resp, err := client.Do(req)
+			url := fmt.Sprintf("%s/ops/backbone/queue/len?queue=%s", common.APIBaseURL, name)
+			resp, err := common.DoRequest(http.MethodGet, url, nil)
 			if err != nil {
 				fmt.Println("❌ Failed to contact API:", err)
 				return

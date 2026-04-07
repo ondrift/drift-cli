@@ -36,6 +36,28 @@ func NewAuthenticatedRequest(method, url string, body io.Reader) (*http.Request,
 // token and retries once. The body parameter is read, buffered, and replayed
 // on retry so callers don't need to worry about re-seekable readers.
 func DoRequest(method, url string, body io.Reader) (*http.Response, error) {
+	return DoRequestWithContentType(method, url, "", body)
+}
+
+// DoJSONRequest is a convenience wrapper for JSON request bodies.
+func DoJSONRequest(method, url string, body io.Reader) (*http.Response, error) {
+	return DoRequestWithContentType(method, url, "application/json", body)
+}
+
+// DoRequestWithContentType is like DoRequest but sets the Content-Type header
+// on both the original request and the post-refresh retry. Pass an empty
+// contentType to skip setting it.
+func DoRequestWithContentType(method, url, contentType string, body io.Reader) (*http.Response, error) {
+	headers := map[string]string{}
+	if contentType != "" {
+		headers["Content-Type"] = contentType
+	}
+	return DoRequestWithHeaders(method, url, body, headers)
+}
+
+// DoRequestWithHeaders is like DoRequest but applies the given headers to
+// both the original request and the post-refresh retry.
+func DoRequestWithHeaders(method, url string, body io.Reader, headers map[string]string) (*http.Response, error) {
 	var bodyBytes []byte
 	if body != nil {
 		var err error
@@ -45,12 +67,18 @@ func DoRequest(method, url string, body io.Reader) (*http.Response, error) {
 		}
 	}
 
-	req, err := NewAuthenticatedRequest(method, url, bytes.NewReader(bodyBytes))
-	if err != nil {
-		return nil, err
+	send := func() (*http.Response, error) {
+		req, err := NewAuthenticatedRequest(method, url, bytes.NewReader(bodyBytes))
+		if err != nil {
+			return nil, err
+		}
+		for k, v := range headers {
+			req.Header.Set(k, v)
+		}
+		return httpClient.Do(req)
 	}
 
-	resp, err := httpClient.Do(req)
+	resp, err := send()
 	if err != nil {
 		return nil, err
 	}
@@ -65,12 +93,7 @@ func DoRequest(method, url string, body io.Reader) (*http.Response, error) {
 		return nil, fmt.Errorf("session expired — run 'drift account login' to re-authenticate")
 	}
 
-	// Retry with the new token.
-	req, err = NewAuthenticatedRequest(method, url, bytes.NewReader(bodyBytes))
-	if err != nil {
-		return nil, err
-	}
-	return httpClient.Do(req)
+	return send()
 }
 
 // refreshAccessToken uses the stored refresh token to obtain a new access

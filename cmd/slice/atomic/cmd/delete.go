@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 
 	"cli/common"
 
@@ -20,18 +19,11 @@ func Delete() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			id := args[0]
 
-			req, err := common.NewAuthenticatedRequest(
+			resp, err := common.DoRequest(
 				http.MethodDelete,
-				"http://api.localhost:30036/ops/atomic/delete?id="+id,
+				common.APIBaseURL+"/ops/atomic/delete?id="+id,
 				nil,
 			)
-			if err != nil {
-				fmt.Println("❌ Not logged in:", err)
-				return
-			}
-
-			client := &http.Client{Timeout: 30 * time.Second}
-			resp, err := client.Do(req)
 			if err != nil {
 				fmt.Println("❌ Failed to contact API:", err)
 				return

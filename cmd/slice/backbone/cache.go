@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 
 	"cli/common"
 
@@ -32,19 +31,11 @@ func cacheSetCmd() *cobra.Command {
 			key, value := args[0], args[1]
 
 			payload, _ := json.Marshal(map[string]any{"key": key, "value": value, "ttl": ttl})
-			req, err := common.NewAuthenticatedRequest(
+			resp, err := common.DoJSONRequest(
 				http.MethodPost,
-				"http://api.localhost:30036/ops/backbone/cache/set",
+				common.APIBaseURL+"/ops/backbone/cache/set",
 				bytes.NewBuffer(payload),
 			)
-			if err != nil {
-				fmt.Println("❌ Not logged in:", err)
-				return
-			}
-			req.Header.Set("Content-Type", "application/json")
-
-			client := &http.Client{Timeout: 10 * time.Second}
-			resp, err := client.Do(req)
 			if err != nil {
 				fmt.Println("❌ Failed to contact API:", err)
 				return
@@ -76,18 +67,11 @@ func cacheGetCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			key := args[0]
 
-			req, err := common.NewAuthenticatedRequest(
+			resp, err := common.DoRequest(
 				http.MethodGet,
-				"http://api.localhost:30036/ops/backbone/cache/get?key="+key,
+				common.APIBaseURL+"/ops/backbone/cache/get?key="+key,
 				nil,
 			)
-			if err != nil {
-				fmt.Println("❌ Not logged in:", err)
-				return
-			}
-
-			client := &http.Client{Timeout: 10 * time.Second}
-			resp, err := client.Do(req)
 			if err != nil {
 				fmt.Println("❌ Failed to contact API:", err)
 				return
@@ -119,19 +103,11 @@ func cacheDelCmd() *cobra.Command {
 			key := args[0]
 
 			payload, _ := json.Marshal(map[string]string{"key": key})
-			req, err := common.NewAuthenticatedRequest(
+			resp, err := common.DoJSONRequest(
 				http.MethodPost,
-				"http://api.localhost:30036/ops/backbone/cache/del",
+				common.APIBaseURL+"/ops/backbone/cache/del",
 				bytes.NewBuffer(payload),
 			)
-			if err != nil {
-				fmt.Println("❌ Not logged in:", err)
-				return
-			}
-			req.Header.Set("Content-Type", "application/json")
-
-			client := &http.Client{Timeout: 10 * time.Second}
-			resp, err := client.Do(req)
 			if err != nil {
 				fmt.Println("❌ Failed to contact API:", err)
 				return
@@ -161,18 +137,11 @@ func cacheExistsCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			key := args[0]
 
-			req, err := common.NewAuthenticatedRequest(
+			resp, err := common.DoRequest(
 				http.MethodGet,
-				"http://api.localhost:30036/ops/backbone/cache/exists?key="+key,
+				common.APIBaseURL+"/ops/backbone/cache/exists?key="+key,
 				nil,
 			)
-			if err != nil {
-				fmt.Println("❌ Not logged in:", err)
-				return
-			}
-
-			client := &http.Client{Timeout: 10 * time.Second}
-			resp, err := client.Do(req)
 			if err != nil {
 				fmt.Println("❌ Failed to contact API:", err)
 				return

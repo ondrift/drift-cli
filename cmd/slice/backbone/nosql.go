@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 
 	"cli/common"
 
@@ -44,19 +43,11 @@ func nosqlWriteCmd() *cobra.Command {
 			}
 
 			payload, _ := json.Marshal(body)
-			req, err := common.NewAuthenticatedRequest(
+			resp, err := common.DoJSONRequest(
 				http.MethodPost,
-				"http://api.localhost:30036/ops/backbone/write",
+				common.APIBaseURL+"/ops/backbone/write",
 				bytes.NewBuffer(payload),
 			)
-			if err != nil {
-				fmt.Println("❌ Not logged in:", err)
-				return
-			}
-			req.Header.Set("Content-Type", "application/json")
-
-			client := &http.Client{Timeout: 10 * time.Second}
-			resp, err := client.Do(req)
 			if err != nil {
 				fmt.Println("❌ Failed to contact API:", err)
 				return
@@ -90,15 +81,8 @@ func nosqlDropCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			name := args[0]
 
-			url := fmt.Sprintf("http://api.localhost:30036/ops/backbone/nosql/drop?collection=%s", name)
-			req, err := common.NewAuthenticatedRequest(http.MethodPost, url, nil)
-			if err != nil {
-				fmt.Println("❌ Not logged in:", err)
-				return
-			}
-
-			client := &http.Client{Timeout: 10 * time.Second}
-			resp, err := client.Do(req)
+			url := fmt.Sprintf("%s/ops/backbone/nosql/drop?collection=%s", common.APIBaseURL, name)
+			resp, err := common.DoRequest(http.MethodPost, url, nil)
 			if err != nil {
 				fmt.Println("❌ Failed to contact API:", err)
 				return
@@ -123,19 +107,12 @@ func nosqlListCmd() *cobra.Command {
 		Short: "List all documents in a collection, with optional field filtering",
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			url := fmt.Sprintf("http://api.localhost:30036/ops/backbone/nosql/list?collection=%s&limit=%d", collection, limit)
+			url := fmt.Sprintf("%s/ops/backbone/nosql/list?collection=%s&limit=%d", common.APIBaseURL, collection, limit)
 			if field != "" && value != "" {
 				url += "&field=" + field + "&value=" + value
 			}
 
-			req, err := common.NewAuthenticatedRequest(http.MethodGet, url, nil)
-			if err != nil {
-				fmt.Println("❌ Not logged in:", err)
-				return
-			}
-
-			client := &http.Client{Timeout: 10 * time.Second}
-			resp, err := client.Do(req)
+			resp, err := common.DoRequest(http.MethodGet, url, nil)
 			if err != nil {
 				fmt.Println("❌ Failed to contact API:", err)
 				return
@@ -187,19 +164,12 @@ func nosqlReadCmd() *cobra.Command {
 				return
 			}
 
-			url := fmt.Sprintf("http://api.localhost:30036/ops/backbone/read?key=%s", key)
+			url := fmt.Sprintf("%s/ops/backbone/read?key=%s", common.APIBaseURL, key)
 			if collection != "" {
 				url += "&collection=" + collection
 			}
 
-			req, err := common.NewAuthenticatedRequest(http.MethodGet, url, nil)
-			if err != nil {
-				fmt.Println("❌ Not logged in:", err)
-				return
-			}
-
-			client := &http.Client{Timeout: 10 * time.Second}
-			resp, err := client.Do(req)
+			resp, err := common.DoRequest(http.MethodGet, url, nil)
 			if err != nil {
 				fmt.Println("❌ Failed to contact API:", err)
 				return

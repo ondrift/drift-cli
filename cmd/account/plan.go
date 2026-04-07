@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"time"
 
 	"cli/common"
 
@@ -44,12 +43,7 @@ type planManifest struct {
 
 // FetchUsage calls GET /ops/plan/usage and returns the parsed response.
 func FetchUsage() (usageResponse, error) {
-	req, err := common.NewAuthenticatedRequest(http.MethodGet, "http://api.localhost:30036/ops/plan/usage", nil)
-	if err != nil {
-		return usageResponse{}, fmt.Errorf("not logged in: %w", err)
-	}
-	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := common.DoRequest(http.MethodGet, common.APIBaseURL+"/ops/plan/usage", nil)
 	if err != nil {
 		return usageResponse{}, fmt.Errorf("failed to contact API: %w", err)
 	}

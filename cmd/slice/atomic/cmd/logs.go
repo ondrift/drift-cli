@@ -23,17 +23,11 @@ func Logs() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			function := args[0]
 
-			req, err := common.NewAuthenticatedRequest(
+			resp, err := common.DoRequest(
 				http.MethodGet,
-				"http://api.localhost:30036/ops/atomic/logs?function="+function,
+				common.APIBaseURL+"/ops/atomic/logs?function="+function,
 				nil,
 			)
-			if err != nil {
-				return fmt.Errorf("not logged in: %w", err)
-			}
-
-			client := &http.Client{Timeout: 15 * time.Second}
-			resp, err := client.Do(req)
 			if err != nil {
 				return fmt.Errorf("could not reach API: %w", err)
 			}

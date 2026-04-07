@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 
 	"cli/common"
 
@@ -32,19 +31,11 @@ func getUpgradeCmd() *cobra.Command {
 				"tier": tier,
 			})
 
-			req, err := common.NewAuthenticatedRequest(
+			resp, err := common.DoJSONRequest(
 				http.MethodPost,
-				"http://api.localhost:30036/ops/slice/upgrade",
+				common.APIBaseURL+"/ops/slice/upgrade",
 				bytes.NewBuffer(body),
 			)
-			if err != nil {
-				fmt.Println("Not logged in:", err)
-				return
-			}
-			req.Header.Set("Content-Type", "application/json")
-
-			client := &http.Client{Timeout: 30 * time.Second}
-			resp, err := client.Do(req)
 			if err != nil {
 				fmt.Println("Failed to contact API:", err)
 				return

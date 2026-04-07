@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 
 	"cli/common"
 
@@ -37,19 +36,11 @@ func secretSetCmd() *cobra.Command {
 			name, value := parts[0], parts[1]
 
 			body, _ := json.Marshal(map[string]string{"name": name, "value": value})
-			req, err := common.NewAuthenticatedRequest(
+			resp, err := common.DoJSONRequest(
 				http.MethodPost,
-				"http://api.localhost:30036/ops/backbone/secret/set",
+				common.APIBaseURL+"/ops/backbone/secret/set",
 				bytes.NewBuffer(body),
 			)
-			if err != nil {
-				fmt.Println("❌ Not logged in:", err)
-				return
-			}
-			req.Header.Set("Content-Type", "application/json")
-
-			client := &http.Client{Timeout: 10 * time.Second}
-			resp, err := client.Do(req)
 			if err != nil {
 				fmt.Println("❌ Failed to contact API:", err)
 				return
@@ -73,18 +64,11 @@ func secretGetCmd() *cobra.Command {
 		Short: "Retrieve the value of a secret",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			req, err := common.NewAuthenticatedRequest(
+			resp, err := common.DoRequest(
 				http.MethodGet,
-				"http://api.localhost:30036/ops/backbone/secret/get?name="+args[0],
+				common.APIBaseURL+"/ops/backbone/secret/get?name="+args[0],
 				nil,
 			)
-			if err != nil {
-				fmt.Println("❌ Not logged in:", err)
-				return
-			}
-
-			client := &http.Client{Timeout: 10 * time.Second}
-			resp, err := client.Do(req)
 			if err != nil {
 				fmt.Println("❌ Failed to contact API:", err)
 				return
@@ -108,18 +92,11 @@ func secretListCmd() *cobra.Command {
 		Short: "List secret names",
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			req, err := common.NewAuthenticatedRequest(
+			resp, err := common.DoRequest(
 				http.MethodGet,
-				"http://api.localhost:30036/ops/backbone/secret/list",
+				common.APIBaseURL+"/ops/backbone/secret/list",
 				nil,
 			)
-			if err != nil {
-				fmt.Println("❌ Not logged in:", err)
-				return
-			}
-
-			client := &http.Client{Timeout: 10 * time.Second}
-			resp, err := client.Do(req)
 			if err != nil {
 				fmt.Println("❌ Failed to contact API:", err)
 				return
@@ -151,19 +128,11 @@ func secretDeleteCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			body, _ := json.Marshal(map[string]string{"name": args[0]})
-			req, err := common.NewAuthenticatedRequest(
+			resp, err := common.DoJSONRequest(
 				http.MethodDelete,
-				"http://api.localhost:30036/ops/backbone/secret/delete",
+				common.APIBaseURL+"/ops/backbone/secret/delete",
 				bytes.NewBuffer(body),
 			)
-			if err != nil {
-				fmt.Println("❌ Not logged in:", err)
-				return
-			}
-			req.Header.Set("Content-Type", "application/json")
-
-			client := &http.Client{Timeout: 10 * time.Second}
-			resp, err := client.Do(req)
 			if err != nil {
 				fmt.Println("❌ Failed to contact API:", err)
 				return

@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 
 	"cli/common"
 
@@ -42,18 +41,11 @@ func authSet() *cobra.Command {
 				"key":      key,
 			})
 
-			req, err := common.NewAuthenticatedRequest(
+			resp, err := common.DoJSONRequest(
 				http.MethodPost,
-				"http://api.localhost:30036/ops/atomic/auth",
+				common.APIBaseURL+"/ops/atomic/auth",
 				bytes.NewReader(body),
 			)
-			if err != nil {
-				return fmt.Errorf("not logged in: %w", err)
-			}
-			req.Header.Set("Content-Type", "application/json")
-
-			client := &http.Client{Timeout: 15 * time.Second}
-			resp, err := client.Do(req)
 			if err != nil {
 				return fmt.Errorf("could not reach API: %w", err)
 			}
@@ -82,17 +74,11 @@ func authList() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			function := args[0]
 
-			req, err := common.NewAuthenticatedRequest(
+			resp, err := common.DoRequest(
 				http.MethodGet,
-				"http://api.localhost:30036/ops/atomic/auth?function="+function,
+				common.APIBaseURL+"/ops/atomic/auth?function="+function,
 				nil,
 			)
-			if err != nil {
-				return fmt.Errorf("not logged in: %w", err)
-			}
-
-			client := &http.Client{Timeout: 15 * time.Second}
-			resp, err := client.Do(req)
 			if err != nil {
 				return fmt.Errorf("could not reach API: %w", err)
 			}
@@ -139,18 +125,11 @@ func authRevoke() *cobra.Command {
 				"method":   strings.ToUpper(method),
 			})
 
-			req, err := common.NewAuthenticatedRequest(
+			resp, err := common.DoJSONRequest(
 				http.MethodDelete,
-				"http://api.localhost:30036/ops/atomic/auth",
+				common.APIBaseURL+"/ops/atomic/auth",
 				bytes.NewReader(body),
 			)
-			if err != nil {
-				return fmt.Errorf("not logged in: %w", err)
-			}
-			req.Header.Set("Content-Type", "application/json")
-
-			client := &http.Client{Timeout: 15 * time.Second}
-			resp, err := client.Do(req)
 			if err != nil {
 				return fmt.Errorf("could not reach API: %w", err)
 			}

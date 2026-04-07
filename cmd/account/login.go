@@ -28,7 +28,7 @@ func DoLogin(username, password string) {
 		Timeout: 30 * time.Second,
 	}
 
-	resp, err := client.Post("http://api.localhost:30036/login", "application/json", bytes.NewBuffer(jsonData))
+	resp, err := client.Post(common.APIBaseURL+"/login", "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		fmt.Println("❌ Failed to send login request:", err)
 		return

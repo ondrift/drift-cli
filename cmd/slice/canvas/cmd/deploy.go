@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 
 	"cli/common"
 
@@ -28,18 +27,15 @@ func Deploy() *cobra.Command {
 				return
 			}
 
-			req, err := common.NewAuthenticatedRequest("POST", "http://api.localhost:30036/ops/canvas", zipData)
-			if err != nil {
-				fmt.Printf("failed to create upload request: %v\n", err)
-				return
-			}
-			req.Header.Set("Content-Type", "application/zip")
-			req.Header.Set("X-Canvas-Site", site)
-
-			client := http.Client{
-				Timeout: 30 * time.Second,
-			}
-			resp, err := client.Do(req)
+			resp, err := common.DoRequestWithHeaders(
+				http.MethodPost,
+				common.APIBaseURL+"/ops/canvas",
+				zipData,
+				map[string]string{
+					"Content-Type":  "application/zip",
+					"X-Canvas-Site": site,
+				},
+			)
 			if err != nil {
 				fmt.Printf("upload failed: %v\n", err)
 				return

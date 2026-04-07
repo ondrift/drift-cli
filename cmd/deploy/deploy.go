@@ -98,7 +98,6 @@ func GetDeployCmd() *cobra.Command {
 			}
 
 			baseDir := filepath.Dir(manifestPath)
-			client := &http.Client{Timeout: 30 * time.Second}
 			start := time.Now()
 
 			fmt.Printf("\n  Deploying %s...\n\n", common.Highlight(m.Name))
@@ -145,7 +144,7 @@ func GetDeployCmd() *cobra.Command {
 					} else {
 						value = entry.Value
 					}
-					if err := cacheSet(client, entry.Key, value, entry.TTL); err != nil {
+					if err := cacheSet(entry.Key, value, entry.TTL); err != nil {
 						sp.Stop()
 						return fmt.Errorf("cache set %q failed: %w", entry.Key, err)
 					}
@@ -160,7 +159,7 @@ func GetDeployCmd() *cobra.Command {
 				for _, entry := range bb.NoSQL {
 					label := fmt.Sprintf("NoSQL: %s", entry.Collection)
 					sp := common.StartSpinner("    ", label)
-					if err := nosqlInit(client, entry.Collection); err != nil {
+					if err := nosqlInit(entry.Collection); err != nil {
 						sp.Stop()
 						return fmt.Errorf("nosql init %q failed: %w", entry.Collection, err)
 					}
@@ -171,7 +170,7 @@ func GetDeployCmd() *cobra.Command {
 				for _, entry := range bb.Queues {
 					label := fmt.Sprintf("Queue: %s", entry.Name)
 					sp := common.StartSpinner("    ", label)
-					if err := queueInit(client, entry.Name); err != nil {
+					if err := queueInit(entry.Name); err != nil {
 						sp.Stop()
 						return fmt.Errorf("queue init %q failed: %w", entry.Name, err)
 					}
@@ -192,7 +191,7 @@ func GetDeployCmd() *cobra.Command {
 								continue
 							}
 						}
-						if err := secretSet(client, entry.Key, value); err != nil {
+						if err := secretSet(entry.Key, value); err != nil {
 							sp.Stop()
 							return fmt.Errorf("secret set %q failed: %w", entry.Key, err)
 						}
@@ -220,7 +219,7 @@ func GetDeployCmd() *cobra.Command {
 						site = "default"
 					}
 					sp := common.StartSpinner("    ", site)
-					if err := deployCanvas(client, dir, site); err != nil {
+					if err := deployCanvas(dir, site); err != nil {
 						sp.Stop()
 						return fmt.Errorf("canvas deploy failed for %s: %w", entry.Dir, err)
 					}
@@ -245,18 +244,20 @@ func resolve(base, rel string) string {
 	return filepath.Join(base, rel)
 }
 
-func deployCanvas(client *http.Client, dir, site string) error {
+func deployCanvas(dir, site string) error {
 	zipData, err := common.ZipFolder(dir)
 	if err != nil {
 		return fmt.Errorf("failed to zip folder: %w", err)
 	}
-	req, err := common.NewAuthenticatedRequest("POST", "http://api.localhost:30036/ops/canvas", zipData)
-	if err != nil {
-		return fmt.Errorf("not logged in: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/zip")
-	req.Header.Set("X-Canvas-Site", site)
-	resp, err := client.Do(req)
+	resp, err := common.DoRequestWithHeaders(
+		http.MethodPost,
+		common.APIBaseURL+"/ops/canvas",
+		zipData,
+		map[string]string{
+			"Content-Type":  "application/zip",
+			"X-Canvas-Site": site,
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("upload failed: %w", err)
 	}
@@ -268,14 +269,9 @@ func deployCanvas(client *http.Client, dir, site string) error {
 	return nil
 }
 
-func cacheSet(client *http.Client, key, value string, ttl int) error {
+func cacheSet(key, value string, ttl int) error {
 	payload, _ := json.Marshal(map[string]any{"key": key, "value": value, "ttl": ttl})
-	req, err := common.NewAuthenticatedRequest(http.MethodPost, "http://api.localhost:30036/ops/backbone/cache/set", bytes.NewBuffer(payload))
-	if err != nil {
-		return fmt.Errorf("not logged in: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := client.Do(req)
+	resp, err := common.DoJSONRequest(http.MethodPost, common.APIBaseURL+"/ops/backbone/cache/set", bytes.NewBuffer(payload))
 	if err != nil {
 		return err
 	}
@@ -287,14 +283,9 @@ func cacheSet(client *http.Client, key, value string, ttl int) error {
 	return nil
 }
 
-func nosqlInit(client *http.Client, collection string) error {
+func nosqlInit(collection string) error {
 	payload, _ := json.Marshal(map[string]any{"collection": collection, "_setup": true})
-	req, err := common.NewAuthenticatedRequest(http.MethodPost, "http://api.localhost:30036/ops/backbone/write", bytes.NewBuffer(payload))
-	if err != nil {
-		return fmt.Errorf("not logged in: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := client.Do(req)
+	resp, err := common.DoJSONRequest(http.MethodPost, common.APIBaseURL+"/ops/backbone/write", bytes.NewBuffer(payload))
 	if err != nil {
 		return err
 	}
@@ -306,14 +297,9 @@ func nosqlInit(client *http.Client, collection string) error {
 	return nil
 }
 
-func queueInit(client *http.Client, name string) error {
+func queueInit(name string) error {
 	payload, _ := json.Marshal(map[string]any{"queue": name, "body": map[string]any{"_setup": true}})
-	req, err := common.NewAuthenticatedRequest(http.MethodPost, "http://api.localhost:30036/ops/backbone/queue/push", bytes.NewBuffer(payload))
-	if err != nil {
-		return fmt.Errorf("not logged in: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := client.Do(req)
+	resp, err := common.DoJSONRequest(http.MethodPost, common.APIBaseURL+"/ops/backbone/queue/push", bytes.NewBuffer(payload))
 	if err != nil {
 		return err
 	}
@@ -325,14 +311,9 @@ func queueInit(client *http.Client, name string) error {
 	return nil
 }
 
-func secretSet(client *http.Client, name, value string) error {
+func secretSet(name, value string) error {
 	payload, _ := json.Marshal(map[string]string{"name": name, "value": value})
-	req, err := common.NewAuthenticatedRequest(http.MethodPost, "http://api.localhost:30036/ops/backbone/secret/set", bytes.NewBuffer(payload))
-	if err != nil {
-		return fmt.Errorf("not logged in: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := client.Do(req)
+	resp, err := common.DoJSONRequest(http.MethodPost, common.APIBaseURL+"/ops/backbone/secret/set", bytes.NewBuffer(payload))
 	if err != nil {
 		return err
 	}

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 
 	"cli/common"
 
@@ -31,19 +30,11 @@ func getCreateCmd() *cobra.Command {
 				"tier": tier,
 			})
 
-			req, err := common.NewAuthenticatedRequest(
+			resp, err := common.DoJSONRequest(
 				http.MethodPost,
-				"http://api.localhost:30036/ops/slice/create",
+				common.APIBaseURL+"/ops/slice/create",
 				bytes.NewBuffer(body),
 			)
-			if err != nil {
-				fmt.Println("Not logged in:", err)
-				return
-			}
-			req.Header.Set("Content-Type", "application/json")
-
-			client := &http.Client{Timeout: 120 * time.Second}
-			resp, err := client.Do(req)
 			if err != nil {
 				fmt.Println("Failed to contact API:", err)
 				return

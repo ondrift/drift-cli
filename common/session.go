@@ -9,8 +9,11 @@ import (
 
 const SessionFile = "~/.drift/session.json"
 
-// APIBaseURL is the base URL for the Drift API gateway.
-const APIBaseURL = "http://api.localhost:30036"
+// APIBaseURL is the base URL for the Drift API gateway. The default points at
+// the local development cluster; production builds override this via:
+//
+//	go build -ldflags "-X cli/common.APIBaseURL=https://api.ondrift.eu"
+var APIBaseURL = "http://api.localhost:30036"
 
 type Session struct {
 	Username    string `json:"username"`

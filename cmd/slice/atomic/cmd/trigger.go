@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 
 	"cli/common"
 
@@ -36,18 +35,11 @@ func triggerListCmd() *cobra.Command {
 		Short: "List all registered triggers",
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			req, err := common.NewAuthenticatedRequest(
+			resp, err := common.DoRequest(
 				http.MethodGet,
-				"http://api.localhost:30036/ops/trigger/list",
+				common.APIBaseURL+"/ops/trigger/list",
 				nil,
 			)
-			if err != nil {
-				fmt.Println("❌ Not logged in:", err)
-				return
-			}
-
-			client := &http.Client{Timeout: 10 * time.Second}
-			resp, err := client.Do(req)
 			if err != nil {
 				fmt.Println("❌ Failed to contact API:", err)
 				return
@@ -104,19 +96,11 @@ func triggerRegisterQueueCmd() *cobra.Command {
 				"poll_ms":    pollMS,
 				"max_retry":  maxRetry,
 			})
-			req, err := common.NewAuthenticatedRequest(
+			resp, err := common.DoJSONRequest(
 				http.MethodPost,
-				"http://api.localhost:30036/ops/trigger/register",
+				common.APIBaseURL+"/ops/trigger/register",
 				bytes.NewBuffer(payload),
 			)
-			if err != nil {
-				fmt.Println("❌ Not logged in:", err)
-				return
-			}
-			req.Header.Set("Content-Type", "application/json")
-
-			client := &http.Client{Timeout: 10 * time.Second}
-			resp, err := client.Do(req)
 			if err != nil {
 				fmt.Println("❌ Failed to contact API:", err)
 				return
@@ -156,19 +140,11 @@ func triggerRegisterScheduleCmd() *cobra.Command {
 				"schedule":   cron,
 				"target_url": target,
 			})
-			req, err := common.NewAuthenticatedRequest(
+			resp, err := common.DoJSONRequest(
 				http.MethodPost,
-				"http://api.localhost:30036/ops/trigger/register",
+				common.APIBaseURL+"/ops/trigger/register",
 				bytes.NewBuffer(payload),
 			)
-			if err != nil {
-				fmt.Println("❌ Not logged in:", err)
-				return
-			}
-			req.Header.Set("Content-Type", "application/json")
-
-			client := &http.Client{Timeout: 10 * time.Second}
-			resp, err := client.Do(req)
 			if err != nil {
 				fmt.Println("❌ Failed to contact API:", err)
 				return
@@ -200,19 +176,11 @@ func triggerUnregisterCmd() *cobra.Command {
 			name := args[0]
 
 			payload, _ := json.Marshal(map[string]string{"name": name})
-			req, err := common.NewAuthenticatedRequest(
+			resp, err := common.DoJSONRequest(
 				http.MethodDelete,
-				"http://api.localhost:30036/ops/trigger/unregister",
+				common.APIBaseURL+"/ops/trigger/unregister",
 				bytes.NewBuffer(payload),
 			)
-			if err != nil {
-				fmt.Println("❌ Not logged in:", err)
-				return
-			}
-			req.Header.Set("Content-Type", "application/json")
-
-			client := &http.Client{Timeout: 10 * time.Second}
-			resp, err := client.Do(req)
 			if err != nil {
 				fmt.Println("❌ Failed to contact API:", err)
 				return
