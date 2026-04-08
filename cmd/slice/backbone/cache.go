@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 
 	"cli/common"
@@ -37,21 +36,20 @@ func cacheSetCmd() *cobra.Command {
 				bytes.NewBuffer(payload),
 			)
 			if err != nil {
-				fmt.Println("❌ Failed to contact API:", err)
+				fmt.Println(common.TransportError("set cache key", err))
 				return
 			}
 			defer resp.Body.Close()
 
-			if resp.StatusCode != http.StatusOK {
-				b, _ := io.ReadAll(resp.Body)
-				fmt.Printf("❌ Failed to set key: %s\n", string(b))
+			if _, err := common.CheckResponse(resp, "set cache key"); err != nil {
+				fmt.Println(err)
 				return
 			}
 
 			if ttl > 0 {
-				fmt.Printf("✅ %q set (ttl: %ds)\n", key, ttl)
+				fmt.Printf("%q set (ttl: %ds)\n", key, ttl)
 			} else {
-				fmt.Printf("✅ %q set (no expiry)\n", key)
+				fmt.Printf("%q set (no expiry)\n", key)
 			}
 		},
 	}
@@ -73,22 +71,20 @@ func cacheGetCmd() *cobra.Command {
 				nil,
 			)
 			if err != nil {
-				fmt.Println("❌ Failed to contact API:", err)
+				fmt.Println(common.TransportError("get cache key", err))
 				return
 			}
 			defer resp.Body.Close()
 
 			if resp.StatusCode == http.StatusNotFound {
-				fmt.Printf("❌ Key %q not found\n", key)
+				fmt.Printf("Key %q not found.\n", key)
 				return
 			}
-			if resp.StatusCode != http.StatusOK {
-				b, _ := io.ReadAll(resp.Body)
-				fmt.Printf("❌ Error: %s\n", string(b))
+			b, err := common.CheckResponse(resp, "get cache key")
+			if err != nil {
+				fmt.Println(err)
 				return
 			}
-
-			b, _ := io.ReadAll(resp.Body)
 			fmt.Println(string(b))
 		},
 	}
@@ -109,22 +105,21 @@ func cacheDelCmd() *cobra.Command {
 				bytes.NewBuffer(payload),
 			)
 			if err != nil {
-				fmt.Println("❌ Failed to contact API:", err)
+				fmt.Println(common.TransportError("delete cache key", err))
 				return
 			}
 			defer resp.Body.Close()
 
 			if resp.StatusCode == http.StatusNotFound {
-				fmt.Printf("❌ Key %q not found\n", key)
+				fmt.Printf("Key %q not found.\n", key)
 				return
 			}
-			if resp.StatusCode != http.StatusOK {
-				b, _ := io.ReadAll(resp.Body)
-				fmt.Printf("❌ Failed to delete key: %s\n", string(b))
+			if _, err := common.CheckResponse(resp, "delete cache key"); err != nil {
+				fmt.Println(err)
 				return
 			}
 
-			fmt.Printf("✅ %q deleted\n", key)
+			fmt.Printf("%q deleted\n", key)
 		},
 	}
 }
@@ -143,24 +138,28 @@ func cacheExistsCmd() *cobra.Command {
 				nil,
 			)
 			if err != nil {
-				fmt.Println("❌ Failed to contact API:", err)
+				fmt.Println(common.TransportError("check cache key", err))
 				return
 			}
 			defer resp.Body.Close()
 
-			b, _ := io.ReadAll(resp.Body)
+			b, err := common.CheckResponse(resp, "check cache key")
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
 			var result struct {
 				Exists bool `json:"exists"`
 			}
 			if err := json.Unmarshal(b, &result); err != nil {
-				fmt.Println("❌ Unexpected response:", string(b))
+				fmt.Printf("Couldn't check cache key: the API response didn't look right (%s)\n", string(b))
 				return
 			}
 
 			if result.Exists {
-				fmt.Printf("✅ %q exists\n", key)
+				fmt.Printf("%q exists\n", key)
 			} else {
-				fmt.Printf("   %q does not exist\n", key)
+				fmt.Printf("%q does not exist\n", key)
 			}
 		},
 	}

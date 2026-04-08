@@ -3,7 +3,6 @@ package account
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -45,16 +44,16 @@ type planManifest struct {
 func FetchUsage() (usageResponse, error) {
 	resp, err := common.DoRequest(http.MethodGet, common.APIBaseURL+"/ops/plan/usage", nil)
 	if err != nil {
-		return usageResponse{}, fmt.Errorf("failed to contact API: %w", err)
+		return usageResponse{}, common.TransportError("fetch your plan usage", err)
 	}
 	defer resp.Body.Close()
-	b, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		return usageResponse{}, fmt.Errorf("API error (%d): %s", resp.StatusCode, strings.TrimSpace(string(b)))
+	b, err := common.CheckResponse(resp, "fetch your plan usage")
+	if err != nil {
+		return usageResponse{}, err
 	}
 	var u usageResponse
 	if err := json.Unmarshal(b, &u); err != nil {
-		return usageResponse{}, fmt.Errorf("unexpected response: %w", err)
+		return usageResponse{}, fmt.Errorf("Couldn't fetch your plan usage: the API response didn't look right (%w)", err)
 	}
 	return u, nil
 }

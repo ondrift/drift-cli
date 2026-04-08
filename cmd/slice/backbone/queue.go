@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 
 	"cli/common"
@@ -31,7 +30,7 @@ func queuePushCmd() *cobra.Command {
 
 			var body map[string]any
 			if err := json.Unmarshal([]byte(rawJSON), &body); err != nil {
-				fmt.Println("❌ Invalid JSON body:", err)
+				fmt.Println("Couldn't push message: that doesn't look like valid JSON —", err)
 				return
 			}
 
@@ -42,22 +41,22 @@ func queuePushCmd() *cobra.Command {
 				bytes.NewBuffer(payload),
 			)
 			if err != nil {
-				fmt.Println("❌ Failed to contact API:", err)
+				fmt.Println(common.TransportError("push message", err))
 				return
 			}
 			defer resp.Body.Close()
 
-			b, _ := io.ReadAll(resp.Body)
-			if resp.StatusCode != http.StatusOK {
-				fmt.Printf("❌ Failed to push message: %s\n", string(b))
+			b, err := common.CheckResponse(resp, "push message")
+			if err != nil {
+				fmt.Println(err)
 				return
 			}
 
 			var result map[string]string
 			if err := json.Unmarshal(b, &result); err == nil {
-				fmt.Printf("✅ Message pushed (id: %s)\n", result["id"])
+				fmt.Printf("Message pushed (id: %s)\n", result["id"])
 			} else {
-				fmt.Println("✅ Message pushed")
+				fmt.Println("Message pushed")
 			}
 		},
 	}
@@ -74,7 +73,7 @@ func queuePopCmd() *cobra.Command {
 			url := fmt.Sprintf("%s/ops/backbone/queue/pop?queue=%s", common.APIBaseURL, name)
 			resp, err := common.DoRequest(http.MethodPost, url, nil)
 			if err != nil {
-				fmt.Println("❌ Failed to contact API:", err)
+				fmt.Println(common.TransportError("pop message", err))
 				return
 			}
 			defer resp.Body.Close()
@@ -84,12 +83,11 @@ func queuePopCmd() *cobra.Command {
 				return
 			}
 
-			b, _ := io.ReadAll(resp.Body)
-			if resp.StatusCode != http.StatusOK {
-				fmt.Printf("❌ Failed to pop message: %s\n", string(b))
+			b, err := common.CheckResponse(resp, "pop message")
+			if err != nil {
+				fmt.Println(err)
 				return
 			}
-
 			fmt.Println(string(b))
 		},
 	}
@@ -106,7 +104,7 @@ func queuePeekCmd() *cobra.Command {
 			url := fmt.Sprintf("%s/ops/backbone/queue/peek?queue=%s", common.APIBaseURL, name)
 			resp, err := common.DoRequest(http.MethodGet, url, nil)
 			if err != nil {
-				fmt.Println("❌ Failed to contact API:", err)
+				fmt.Println(common.TransportError("peek queue", err))
 				return
 			}
 			defer resp.Body.Close()
@@ -116,12 +114,11 @@ func queuePeekCmd() *cobra.Command {
 				return
 			}
 
-			b, _ := io.ReadAll(resp.Body)
-			if resp.StatusCode != http.StatusOK {
-				fmt.Printf("❌ Failed to peek queue: %s\n", string(b))
+			b, err := common.CheckResponse(resp, "peek queue")
+			if err != nil {
+				fmt.Println(err)
 				return
 			}
-
 			fmt.Println(string(b))
 		},
 	}
@@ -138,17 +135,16 @@ func queueDropCmd() *cobra.Command {
 			url := fmt.Sprintf("%s/ops/backbone/queue/drop?queue=%s", common.APIBaseURL, name)
 			resp, err := common.DoRequest(http.MethodPost, url, nil)
 			if err != nil {
-				fmt.Println("❌ Failed to contact API:", err)
+				fmt.Println(common.TransportError("drop queue", err))
 				return
 			}
 			defer resp.Body.Close()
 
-			if resp.StatusCode != http.StatusNoContent {
-				b, _ := io.ReadAll(resp.Body)
-				fmt.Printf("❌ Failed to drop queue: %s\n", string(b))
+			if _, err := common.CheckResponse(resp, "drop queue"); err != nil {
+				fmt.Println(err)
 				return
 			}
-			fmt.Printf("✅ Queue %q dropped\n", name)
+			fmt.Printf("Queue %q dropped\n", name)
 		},
 	}
 }
@@ -164,14 +160,14 @@ func queueLenCmd() *cobra.Command {
 			url := fmt.Sprintf("%s/ops/backbone/queue/len?queue=%s", common.APIBaseURL, name)
 			resp, err := common.DoRequest(http.MethodGet, url, nil)
 			if err != nil {
-				fmt.Println("❌ Failed to contact API:", err)
+				fmt.Println(common.TransportError("get queue length", err))
 				return
 			}
 			defer resp.Body.Close()
 
-			b, _ := io.ReadAll(resp.Body)
-			if resp.StatusCode != http.StatusOK {
-				fmt.Printf("❌ Failed to get queue length: %s\n", string(b))
+			b, err := common.CheckResponse(resp, "get queue length")
+			if err != nil {
+				fmt.Println(err)
 				return
 			}
 

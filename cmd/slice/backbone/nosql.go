@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 
 	"cli/common"
@@ -29,13 +28,13 @@ func nosqlWriteCmd() *cobra.Command {
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			if data == "" {
-				fmt.Println("❌ --data is required")
+				fmt.Println("Couldn't write document: --data is required.")
 				return
 			}
 
 			var body map[string]any
 			if err := json.Unmarshal([]byte(data), &body); err != nil {
-				fmt.Println("❌ Invalid JSON:", err)
+				fmt.Println("Couldn't write document: that doesn't look like valid JSON —", err)
 				return
 			}
 			if collection != "" {
@@ -49,21 +48,20 @@ func nosqlWriteCmd() *cobra.Command {
 				bytes.NewBuffer(payload),
 			)
 			if err != nil {
-				fmt.Println("❌ Failed to contact API:", err)
+				fmt.Println(common.TransportError("write document", err))
 				return
 			}
 			defer resp.Body.Close()
 
-			if resp.StatusCode != http.StatusOK {
-				b, _ := io.ReadAll(resp.Body)
-				fmt.Printf("❌ Write failed: %s\n", string(b))
+			if _, err := common.CheckResponse(resp, "write document"); err != nil {
+				fmt.Println(err)
 				return
 			}
 
 			if collection != "" {
-				fmt.Printf("✅ Document written to collection %q\n", collection)
+				fmt.Printf("Document written to collection %q\n", collection)
 			} else {
-				fmt.Println("✅ Document written")
+				fmt.Println("Document written")
 			}
 		},
 	}
@@ -84,17 +82,16 @@ func nosqlDropCmd() *cobra.Command {
 			url := fmt.Sprintf("%s/ops/backbone/nosql/drop?collection=%s", common.APIBaseURL, name)
 			resp, err := common.DoRequest(http.MethodPost, url, nil)
 			if err != nil {
-				fmt.Println("❌ Failed to contact API:", err)
+				fmt.Println(common.TransportError("drop collection", err))
 				return
 			}
 			defer resp.Body.Close()
 
-			if resp.StatusCode != http.StatusNoContent {
-				b, _ := io.ReadAll(resp.Body)
-				fmt.Printf("❌ Failed to drop collection: %s\n", string(b))
+			if _, err := common.CheckResponse(resp, "drop collection"); err != nil {
+				fmt.Println(err)
 				return
 			}
-			fmt.Printf("✅ Collection %q dropped\n", name)
+			fmt.Printf("Collection %q dropped\n", name)
 		},
 	}
 }
@@ -114,14 +111,14 @@ func nosqlListCmd() *cobra.Command {
 
 			resp, err := common.DoRequest(http.MethodGet, url, nil)
 			if err != nil {
-				fmt.Println("❌ Failed to contact API:", err)
+				fmt.Println(common.TransportError("list documents", err))
 				return
 			}
 			defer resp.Body.Close()
 
-			b, _ := io.ReadAll(resp.Body)
-			if resp.StatusCode != http.StatusOK {
-				fmt.Printf("❌ List failed: %s\n", string(b))
+			b, err := common.CheckResponse(resp, "list documents")
+			if err != nil {
+				fmt.Println(err)
 				return
 			}
 
@@ -160,7 +157,7 @@ func nosqlReadCmd() *cobra.Command {
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			if key == "" {
-				fmt.Println("❌ --key is required")
+				fmt.Println("Couldn't read document: --key is required.")
 				return
 			}
 
@@ -171,14 +168,14 @@ func nosqlReadCmd() *cobra.Command {
 
 			resp, err := common.DoRequest(http.MethodGet, url, nil)
 			if err != nil {
-				fmt.Println("❌ Failed to contact API:", err)
+				fmt.Println(common.TransportError("read document", err))
 				return
 			}
 			defer resp.Body.Close()
 
-			b, _ := io.ReadAll(resp.Body)
-			if resp.StatusCode != http.StatusOK {
-				fmt.Printf("❌ Read failed: %s\n", string(b))
+			b, err := common.CheckResponse(resp, "read document")
+			if err != nil {
+				fmt.Println(err)
 				return
 			}
 

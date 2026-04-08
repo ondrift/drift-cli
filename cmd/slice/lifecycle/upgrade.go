@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 
 	"cli/common"
@@ -37,14 +36,13 @@ func getUpgradeCmd() *cobra.Command {
 				bytes.NewBuffer(body),
 			)
 			if err != nil {
-				fmt.Println("Failed to contact API:", err)
+				fmt.Println(common.TransportError("upgrade slice", err))
 				return
 			}
 			defer resp.Body.Close()
 
-			respBytes, _ := io.ReadAll(resp.Body)
-			if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-				fmt.Printf("Upgrade failed: %s\n", string(respBytes))
+			if _, err := common.CheckResponse(resp, "upgrade slice"); err != nil {
+				fmt.Println(err)
 				return
 			}
 

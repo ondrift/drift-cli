@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 
@@ -14,56 +13,44 @@ import (
 )
 
 func DoLogin(username, password string) {
-	reqBody := map[string]string{
+	jsonData, _ := json.Marshal(map[string]string{
 		"username": username,
 		"password": password,
-	}
-	jsonData, err := json.Marshal(reqBody)
-	if err != nil {
-		fmt.Println("❌ Failed to marshal JSON:", err)
-		return
-	}
+	})
 
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-	}
+	client := &http.Client{Timeout: 30 * time.Second}
 
 	resp, err := client.Post(common.APIBaseURL+"/login", "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
-		fmt.Println("❌ Failed to send login request:", err)
+		fmt.Println(common.TransportError("log in", err))
 		return
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		fmt.Printf("❌ Login failed: %s\n", string(bodyBytes))
+	body, err := common.CheckResponse(resp, "log in")
+	if err != nil {
+		fmt.Println(err)
 		return
 	}
 
 	var respData map[string]string
-	if err := json.NewDecoder(resp.Body).Decode(&respData); err != nil {
-		fmt.Println("❌ Failed to parse response:", err)
+	if err := json.Unmarshal(body, &respData); err != nil {
+		fmt.Println("Couldn't log in: the API response didn't look right —", err)
 		return
 	}
 
-	token, ok := respData["access_token"]
-	if !ok {
-		fmt.Println("❌ No token found in response")
+	token := respData["access_token"]
+	refreshToken := respData["refresh_token"]
+	if token == "" || refreshToken == "" {
+		fmt.Println("Couldn't log in: the API didn't return a full set of tokens. That's on us; please try again.")
 		return
 	}
 
-	refresh_token, ok := respData["refresh_token"]
-	if !ok {
-		fmt.Println("❌ No refresh token found in response")
+	if err := common.SaveSession(token, refreshToken); err != nil {
+		fmt.Println("Logged in, but couldn't save your session to disk:", err)
 		return
 	}
-
-	err = common.SaveSession(token, refresh_token)
-	if err != nil {
-		fmt.Println("❌ Failed to save token:", err)
-		return
-	}
+	fmt.Printf("Logged in as %s.\n", username)
 }
 
 func GetLoginCmd() *cobra.Command {

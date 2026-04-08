@@ -2,8 +2,9 @@ package lifecycle
 
 import (
 	"fmt"
-	"io"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"cli/common"
 
@@ -13,31 +14,44 @@ import (
 func getDeleteCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "delete <name>",
-		Short: "Delete a slice and all its resources (irreversible)",
+		Short: "Delete a slice and everything in it (irreversible)",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			name := args[0]
 
-			confirm := common.PromptForInput(fmt.Sprintf("Type '%s' to confirm deletion", name))
-			if confirm != name {
+			printDeleteWarning(name)
+
+			// First confirmation: plain yes/no.
+			first := strings.ToLower(strings.TrimSpace(
+				common.PromptForInput("Proceed with deletion? [y/N]"),
+			))
+			if first != "y" && first != "yes" {
 				fmt.Println("Deletion cancelled.")
+				return
+			}
+
+			// Second confirmation: type the slice name verbatim.
+			typed := strings.TrimSpace(
+				common.PromptForInput(fmt.Sprintf("Type '%s' to confirm", name)),
+			)
+			if typed != name {
+				fmt.Println("Deletion cancelled — name did not match.")
 				return
 			}
 
 			resp, err := common.DoRequest(
 				http.MethodDelete,
-				common.APIBaseURL+"/ops/slice/delete?name="+name,
+				common.APIBaseURL+"/ops/slice/delete?name="+url.QueryEscape(name),
 				nil,
 			)
 			if err != nil {
-				fmt.Println("Failed to contact API:", err)
+				fmt.Println(common.TransportError("delete slice", err))
 				return
 			}
 			defer resp.Body.Close()
 
-			if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-				body, _ := io.ReadAll(resp.Body)
-				fmt.Printf("Slice deletion failed: %s\n", string(body))
+			if _, err := common.CheckResponse(resp, "delete slice"); err != nil {
+				fmt.Println(err)
 				return
 			}
 
@@ -49,4 +63,32 @@ func getDeleteCmd() *cobra.Command {
 			fmt.Printf("Slice '%s' deleted.\n", name)
 		},
 	}
+}
+
+// printDeleteWarning spells out exactly what will be destroyed so the user
+// can't plausibly claim surprise. Keep this tone honest and direct — this is
+// a destructive, irreversible action.
+func printDeleteWarning(name string) {
+	active := ""
+	if common.GetActiveSlice() == name {
+		active = "  (this is your currently active slice)"
+	}
+	fmt.Printf(`
+────────────────────────────────────────────────────────────
+  You are about to delete slice '%s'%s.
+────────────────────────────────────────────────────────────
+
+This will PERMANENTLY destroy, with no recovery:
+
+  • Every atomic function deployed to this slice
+  • Every canvas site hosted on this slice
+  • The entire backbone: NoSQL collections, queues, blobs,
+    secrets, cached data, and vector indexes
+  • All logs, metrics, and deployment history
+  • The slice's Kubernetes namespace and all resources in it
+  • The slice's database
+
+There is NO undo. There is NO backup we can restore from.
+
+`, name, active)
 }

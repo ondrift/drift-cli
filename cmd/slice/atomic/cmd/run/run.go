@@ -220,7 +220,7 @@ func (r *devRunner) rebuild() error {
 		return err
 	}
 	if err := r.buildAndRun(); err != nil {
-		log.Printf("❌ build/run failed: %v", err)
+		log.Printf("build/run failed: %v", err)
 		return err
 	}
 	return nil

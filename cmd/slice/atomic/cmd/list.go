@@ -3,7 +3,6 @@ package atomic_cmd
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"sort"
 
@@ -29,18 +28,18 @@ func fetchDeployedFunctions() ([]atomicRecord, error) {
 		nil,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to contact API: %w", err)
+		return nil, common.TransportError("list atomic functions", err)
 	}
 	defer resp.Body.Close()
 
-	b, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API error (%d): %s", resp.StatusCode, string(b))
+	b, err := common.CheckResponse(resp, "list atomic functions")
+	if err != nil {
+		return nil, err
 	}
 
 	var records []atomicRecord
 	if err := json.Unmarshal(b, &records); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w", err)
+		return nil, fmt.Errorf("Couldn't list atomic functions: the API response didn't look right (%w)", err)
 	}
 
 	// Filter to only deployed (pre-warmed slots have no function name).
@@ -81,7 +80,7 @@ func List() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			deployed, err := fetchDeployedFunctions()
 			if err != nil {
-				fmt.Println("❌", err)
+				fmt.Println(err)
 				return
 			}
 			if len(deployed) == 0 {

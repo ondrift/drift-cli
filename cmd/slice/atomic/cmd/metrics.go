@@ -3,7 +3,6 @@ package atomic_cmd
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 
 	"cli/common"
@@ -26,13 +25,13 @@ func Metrics() *cobra.Command {
 				nil,
 			)
 			if err != nil {
-				return fmt.Errorf("could not reach API: %w", err)
+				return common.TransportError("fetch function metrics", err)
 			}
 			defer resp.Body.Close()
 
-			if resp.StatusCode != http.StatusOK {
-				b, _ := io.ReadAll(resp.Body)
-				return fmt.Errorf("API error (%d): %s", resp.StatusCode, string(b))
+			b, err := common.CheckResponse(resp, "fetch function metrics")
+			if err != nil {
+				return err
 			}
 
 			var m struct {
@@ -41,8 +40,8 @@ func Metrics() *cobra.Command {
 				ErrorRate     float64 `json:"error_rate"`
 				AvgDurationMs float64 `json:"avg_duration_ms"`
 			}
-			if err := json.NewDecoder(resp.Body).Decode(&m); err != nil {
-				return fmt.Errorf("failed to parse response: %w", err)
+			if err := json.Unmarshal(b, &m); err != nil {
+				return fmt.Errorf("Couldn't fetch function metrics: the API response didn't look right (%w)", err)
 			}
 
 			fmt.Printf("Function:        %s\n", function)

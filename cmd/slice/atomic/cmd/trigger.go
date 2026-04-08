@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 
 	"cli/common"
@@ -41,14 +40,14 @@ func triggerListCmd() *cobra.Command {
 				nil,
 			)
 			if err != nil {
-				fmt.Println("❌ Failed to contact API:", err)
+				fmt.Println(common.TransportError("list triggers", err))
 				return
 			}
 			defer resp.Body.Close()
 
-			b, _ := io.ReadAll(resp.Body)
-			if resp.StatusCode != http.StatusOK {
-				fmt.Printf("❌ Failed to list triggers: %s\n", string(b))
+			b, err := common.CheckResponse(resp, "list triggers")
+			if err != nil {
+				fmt.Println(err)
 				return
 			}
 
@@ -102,18 +101,17 @@ func triggerRegisterQueueCmd() *cobra.Command {
 				bytes.NewBuffer(payload),
 			)
 			if err != nil {
-				fmt.Println("❌ Failed to contact API:", err)
+				fmt.Println(common.TransportError("register the queue trigger", err))
 				return
 			}
 			defer resp.Body.Close()
 
-			b, _ := io.ReadAll(resp.Body)
-			if resp.StatusCode != http.StatusOK {
-				fmt.Printf("❌ Failed to register trigger: %s\n", string(b))
+			if _, err := common.CheckResponse(resp, "register the queue trigger"); err != nil {
+				fmt.Println(err)
 				return
 			}
 
-			fmt.Printf("✅ Queue trigger %q registered (queue: %s, poll: %dms)\n", name, queue, pollMS)
+			fmt.Printf("Queue trigger %q registered (queue: %s, poll: %dms)\n", name, queue, pollMS)
 		},
 	}
 	cmd.Flags().StringVar(&queue, "queue", "", "Backbone queue name to watch (required)")
@@ -146,18 +144,17 @@ func triggerRegisterScheduleCmd() *cobra.Command {
 				bytes.NewBuffer(payload),
 			)
 			if err != nil {
-				fmt.Println("❌ Failed to contact API:", err)
+				fmt.Println(common.TransportError("register the schedule trigger", err))
 				return
 			}
 			defer resp.Body.Close()
 
-			b, _ := io.ReadAll(resp.Body)
-			if resp.StatusCode != http.StatusOK {
-				fmt.Printf("❌ Failed to register trigger: %s\n", string(b))
+			if _, err := common.CheckResponse(resp, "register the schedule trigger"); err != nil {
+				fmt.Println(err)
 				return
 			}
 
-			fmt.Printf("✅ Schedule trigger %q registered (cron: %s)\n", name, cron)
+			fmt.Printf("Schedule trigger %q registered (cron: %s)\n", name, cron)
 		},
 	}
 	cmd.Flags().StringVar(&cron, "cron", "", "5-field cron expression, e.g. \"*/5 * * * *\" (required)")
@@ -182,18 +179,17 @@ func triggerUnregisterCmd() *cobra.Command {
 				bytes.NewBuffer(payload),
 			)
 			if err != nil {
-				fmt.Println("❌ Failed to contact API:", err)
+				fmt.Println(common.TransportError("unregister the trigger", err))
 				return
 			}
 			defer resp.Body.Close()
 
-			b, _ := io.ReadAll(resp.Body)
-			if resp.StatusCode != http.StatusOK {
-				fmt.Printf("❌ Failed to unregister trigger: %s\n", string(b))
+			if _, err := common.CheckResponse(resp, "unregister the trigger"); err != nil {
+				fmt.Println(err)
 				return
 			}
 
-			fmt.Printf("✅ Trigger %q unregistered\n", name)
+			fmt.Printf("Trigger %q unregistered\n", name)
 		},
 	}
 }

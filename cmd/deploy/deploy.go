@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -259,68 +258,53 @@ func deployCanvas(dir, site string) error {
 		},
 	)
 	if err != nil {
-		return fmt.Errorf("upload failed: %w", err)
+		return common.TransportError("deploy canvas site", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("upload failed (%d): %s", resp.StatusCode, string(body))
-	}
-	return nil
+	_, err = common.CheckResponse(resp, "deploy canvas site")
+	return err
 }
 
 func cacheSet(key, value string, ttl int) error {
 	payload, _ := json.Marshal(map[string]any{"key": key, "value": value, "ttl": ttl})
 	resp, err := common.DoJSONRequest(http.MethodPost, common.APIBaseURL+"/ops/backbone/cache/set", bytes.NewBuffer(payload))
 	if err != nil {
-		return err
+		return common.TransportError("seed cache key", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		b, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("API returned %d: %s", resp.StatusCode, string(b))
-	}
-	return nil
+	_, err = common.CheckResponse(resp, "seed cache key")
+	return err
 }
 
 func nosqlInit(collection string) error {
 	payload, _ := json.Marshal(map[string]any{"collection": collection, "_setup": true})
 	resp, err := common.DoJSONRequest(http.MethodPost, common.APIBaseURL+"/ops/backbone/write", bytes.NewBuffer(payload))
 	if err != nil {
-		return err
+		return common.TransportError("initialise NoSQL collection", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		b, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("API returned %d: %s", resp.StatusCode, string(b))
-	}
-	return nil
+	_, err = common.CheckResponse(resp, "initialise NoSQL collection")
+	return err
 }
 
 func queueInit(name string) error {
 	payload, _ := json.Marshal(map[string]any{"queue": name, "body": map[string]any{"_setup": true}})
 	resp, err := common.DoJSONRequest(http.MethodPost, common.APIBaseURL+"/ops/backbone/queue/push", bytes.NewBuffer(payload))
 	if err != nil {
-		return err
+		return common.TransportError("initialise queue", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		b, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("API returned %d: %s", resp.StatusCode, string(b))
-	}
-	return nil
+	_, err = common.CheckResponse(resp, "initialise queue")
+	return err
 }
 
 func secretSet(name, value string) error {
 	payload, _ := json.Marshal(map[string]string{"name": name, "value": value})
 	resp, err := common.DoJSONRequest(http.MethodPost, common.APIBaseURL+"/ops/backbone/secret/set", bytes.NewBuffer(payload))
 	if err != nil {
-		return err
+		return common.TransportError("store secret", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusNoContent {
-		b, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("API returned %d: %s", resp.StatusCode, string(b))
-	}
-	return nil
+	_, err = common.CheckResponse(resp, "store secret")
+	return err
 }

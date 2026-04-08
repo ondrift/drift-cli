@@ -55,7 +55,7 @@ func Go() *cobra.Command {
 
 			err := GenerateAtomicFunction(name, method, "go", auth)
 			if err != nil {
-				fmt.Printf("❌ Error: %v\n", err)
+				fmt.Printf("Couldn't create function: %v\n", err)
 				return
 			}
 

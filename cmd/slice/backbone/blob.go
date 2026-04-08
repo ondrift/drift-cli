@@ -31,7 +31,7 @@ func blobPutCmd() *cobra.Command {
 
 			f, err := os.Open(file)
 			if err != nil {
-				fmt.Printf("❌ Failed to open file: %v\n", err)
+				fmt.Printf("Couldn't put blob: failed to open %s (%v)\n", file, err)
 				return
 			}
 			defer f.Close()
@@ -39,18 +39,17 @@ func blobPutCmd() *cobra.Command {
 			url := fmt.Sprintf("%s/ops/backbone/blob/put?bucket=%s&key=%s", common.APIBaseURL, bucket, key)
 			resp, err := common.DoRequestWithContentType(http.MethodPost, url, "application/octet-stream", f)
 			if err != nil {
-				fmt.Println("❌ Failed to contact API:", err)
+				fmt.Println(common.TransportError("put blob", err))
 				return
 			}
 			defer resp.Body.Close()
 
-			if resp.StatusCode != http.StatusOK {
-				b, _ := io.ReadAll(resp.Body)
-				fmt.Printf("❌ Failed to put blob: %s\n", string(b))
+			if _, err := common.CheckResponse(resp, "put blob"); err != nil {
+				fmt.Println(err)
 				return
 			}
 
-			fmt.Printf("✅ Blob stored at %s/%s\n", bucket, key)
+			fmt.Printf("Blob stored at %s/%s\n", bucket, key)
 		},
 	}
 }
@@ -66,20 +65,20 @@ func blobGetCmd() *cobra.Command {
 			url := fmt.Sprintf("%s/ops/backbone/blob/get?bucket=%s&key=%s", common.APIBaseURL, bucket, key)
 			resp, err := common.DoRequest(http.MethodGet, url, nil)
 			if err != nil {
-				fmt.Println("❌ Failed to contact API:", err)
-				return
+				fmt.Fprintln(os.Stderr, common.TransportError("get blob", err))
+				os.Exit(1)
 			}
 			defer resp.Body.Close()
 
-			if resp.StatusCode != http.StatusOK {
-				b, _ := io.ReadAll(resp.Body)
-				fmt.Fprintf(os.Stderr, "❌ Failed to get blob: %s\n", string(b))
-				os.Exit(1)
-				return
+			if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+				if _, err := common.CheckResponse(resp, "get blob"); err != nil {
+					fmt.Fprintln(os.Stderr, err)
+					os.Exit(1)
+				}
 			}
 
 			if _, err := io.Copy(os.Stdout, resp.Body); err != nil {
-				fmt.Fprintf(os.Stderr, "❌ Error reading blob: %v\n", err)
+				fmt.Fprintf(os.Stderr, "Couldn't get blob: error while streaming the body (%v)\n", err)
 				os.Exit(1)
 			}
 		},
@@ -97,14 +96,14 @@ func blobListCmd() *cobra.Command {
 			url := fmt.Sprintf("%s/ops/backbone/blob/list?bucket=%s", common.APIBaseURL, bucket)
 			resp, err := common.DoRequest(http.MethodGet, url, nil)
 			if err != nil {
-				fmt.Println("❌ Failed to contact API:", err)
+				fmt.Println(common.TransportError("list blobs", err))
 				return
 			}
 			defer resp.Body.Close()
 
-			b, _ := io.ReadAll(resp.Body)
-			if resp.StatusCode != http.StatusOK {
-				fmt.Printf("❌ Failed to list blobs: %s\n", string(b))
+			b, err := common.CheckResponse(resp, "list blobs")
+			if err != nil {
+				fmt.Println(err)
 				return
 			}
 
@@ -131,18 +130,17 @@ func blobDeleteCmd() *cobra.Command {
 			url := fmt.Sprintf("%s/ops/backbone/blob/delete?bucket=%s&key=%s", common.APIBaseURL, bucket, key)
 			resp, err := common.DoRequest(http.MethodPost, url, nil)
 			if err != nil {
-				fmt.Println("❌ Failed to contact API:", err)
+				fmt.Println(common.TransportError("delete blob", err))
 				return
 			}
 			defer resp.Body.Close()
 
-			if resp.StatusCode != http.StatusOK {
-				b, _ := io.ReadAll(resp.Body)
-				fmt.Printf("❌ Failed to delete blob: %s\n", string(b))
+			if _, err := common.CheckResponse(resp, "delete blob"); err != nil {
+				fmt.Println(err)
 				return
 			}
 
-			fmt.Printf("✅ Blob %s/%s deleted\n", bucket, key)
+			fmt.Printf("Blob %s/%s deleted\n", bucket, key)
 		},
 	}
 }

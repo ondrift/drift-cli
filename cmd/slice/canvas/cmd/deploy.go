@@ -2,7 +2,6 @@ package slate_cmd
 
 import (
 	"fmt"
-	"io"
 	"net/http"
 
 	"cli/common"
@@ -23,7 +22,7 @@ func Deploy() *cobra.Command {
 
 			zipData, err := common.ZipFolder(folder)
 			if err != nil {
-				fmt.Printf("failed to zip folder: %v\n", err)
+				fmt.Printf("Couldn't deploy canvas site: failed to zip folder (%v)\n", err)
 				return
 			}
 
@@ -37,21 +36,21 @@ func Deploy() *cobra.Command {
 				},
 			)
 			if err != nil {
-				fmt.Printf("upload failed: %v\n", err)
+				fmt.Println(common.TransportError("deploy canvas site", err))
 				return
 			}
 			defer resp.Body.Close()
 
-			if resp.StatusCode != http.StatusOK {
-				body, _ := io.ReadAll(resp.Body)
-				fmt.Printf("upload failed with status %d: %s\n", resp.StatusCode, string(body))
+			if _, err := common.CheckResponse(resp, "deploy canvas site"); err != nil {
+				fmt.Println(err)
+				return
 			}
 
-			fmt.Println("Upload successful!")
+			fmt.Println("Canvas site deployed.")
 		},
 	}
 
-	deployCmd.Flags().StringVarP(&site, "site", "s", "default", "Canvas site name (accessible at <site>.<username>.ondrift.eu)")
+	deployCmd.Flags().StringVarP(&site, "site", "s", "default", "Canvas site name (accessible at <site>.<username>-<slice>.ondrift.eu)")
 
 	return deployCmd
 }

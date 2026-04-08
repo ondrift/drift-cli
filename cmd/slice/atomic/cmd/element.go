@@ -26,7 +26,7 @@ func elementList() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			deployed, err := fetchDeployedFunctions()
 			if err != nil {
-				fmt.Println("❌", err)
+				fmt.Println(err)
 				return
 			}
 

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 
@@ -30,7 +29,7 @@ func secretSetCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			parts := strings.SplitN(args[0], "=", 2)
 			if len(parts) != 2 || parts[0] == "" {
-				fmt.Println("❌ argument must be in KEY=VALUE format")
+				fmt.Println("Couldn't store secret: argument must be in KEY=VALUE format.")
 				return
 			}
 			name, value := parts[0], parts[1]
@@ -42,18 +41,17 @@ func secretSetCmd() *cobra.Command {
 				bytes.NewBuffer(body),
 			)
 			if err != nil {
-				fmt.Println("❌ Failed to contact API:", err)
+				fmt.Println(common.TransportError("store secret", err))
 				return
 			}
 			defer resp.Body.Close()
 
-			if resp.StatusCode != http.StatusNoContent {
-				b, _ := io.ReadAll(resp.Body)
-				fmt.Printf("❌ Failed to store secret: %s\n", string(b))
+			if _, err := common.CheckResponse(resp, "store secret"); err != nil {
+				fmt.Println(err)
 				return
 			}
 
-			fmt.Printf("✅ Secret %q stored\n", name)
+			fmt.Printf("Secret %q stored\n", name)
 		},
 	}
 }
@@ -70,14 +68,14 @@ func secretGetCmd() *cobra.Command {
 				nil,
 			)
 			if err != nil {
-				fmt.Println("❌ Failed to contact API:", err)
+				fmt.Println(common.TransportError("get secret", err))
 				return
 			}
 			defer resp.Body.Close()
 
-			b, _ := io.ReadAll(resp.Body)
-			if resp.StatusCode != http.StatusOK {
-				fmt.Printf("❌ Failed to get secret: %s\n", string(b))
+			b, err := common.CheckResponse(resp, "get secret")
+			if err != nil {
+				fmt.Println(err)
 				return
 			}
 
@@ -98,14 +96,14 @@ func secretListCmd() *cobra.Command {
 				nil,
 			)
 			if err != nil {
-				fmt.Println("❌ Failed to contact API:", err)
+				fmt.Println(common.TransportError("list secrets", err))
 				return
 			}
 			defer resp.Body.Close()
 
-			b, _ := io.ReadAll(resp.Body)
-			if resp.StatusCode != http.StatusOK {
-				fmt.Printf("❌ Failed to list secrets: %s\n", string(b))
+			b, err := common.CheckResponse(resp, "list secrets")
+			if err != nil {
+				fmt.Println(err)
 				return
 			}
 
@@ -134,18 +132,17 @@ func secretDeleteCmd() *cobra.Command {
 				bytes.NewBuffer(body),
 			)
 			if err != nil {
-				fmt.Println("❌ Failed to contact API:", err)
+				fmt.Println(common.TransportError("delete secret", err))
 				return
 			}
 			defer resp.Body.Close()
 
-			if resp.StatusCode != http.StatusNoContent {
-				b, _ := io.ReadAll(resp.Body)
-				fmt.Printf("❌ Failed to delete secret: %s\n", string(b))
+			if _, err := common.CheckResponse(resp, "delete secret"); err != nil {
+				fmt.Println(err)
 				return
 			}
 
-			fmt.Printf("✅ Secret %q deleted\n", args[0])
+			fmt.Printf("Secret %q deleted\n", args[0])
 		},
 	}
 }

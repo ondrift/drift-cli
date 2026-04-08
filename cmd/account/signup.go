@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
-	"log"
 	"net/http"
 	"time"
 
@@ -43,13 +41,13 @@ func GetSignupCmd() *cobra.Command {
 			}
 
 			if password != repeatPassword {
-				fmt.Println("❌ Passwords don't match")
+				fmt.Println("Those passwords don't match. Try again.")
 				return
 			}
 
 			hashedPassword, err := HashPassword(password)
 			if err != nil {
-				fmt.Println("❌ Failed to hash password")
+				fmt.Println("Couldn't hash your password locally —", err)
 				return
 			}
 
@@ -65,13 +63,13 @@ func GetSignupCmd() *cobra.Command {
 			client := &http.Client{Timeout: 30 * time.Second}
 			resp, err := client.Post(common.APIBaseURL+"/signup/initiate", "application/json", bytes.NewBuffer(initiatePayload))
 			if err != nil {
-				log.Fatalf("request failed: %v", err)
+				fmt.Println(common.TransportError("sign up", err))
+				return
 			}
-			body, _ := io.ReadAll(resp.Body)
+			body, err := common.CheckResponse(resp, "sign up")
 			resp.Body.Close()
-
-			if resp.StatusCode >= 400 {
-				fmt.Printf("❌ Signup failed: %s\n", string(body))
+			if err != nil {
+				fmt.Println(err)
 				return
 			}
 
@@ -86,9 +84,9 @@ func GetSignupCmd() *cobra.Command {
 			var code string
 			if initiateResp.DevMode {
 				code = "000000"
-				fmt.Println("⚡ Dev mode — skipping email verification")
+				fmt.Println("Dev mode — skipping email verification.")
 			} else {
-				fmt.Println("✅ Check your email for a 6-digit verification code.")
+				fmt.Println("Check your email for a 6-digit verification code.")
 				code = common.PromptForInput("Verification code")
 			}
 
@@ -99,13 +97,13 @@ func GetSignupCmd() *cobra.Command {
 
 			resp, err = client.Post(common.APIBaseURL+"/signup/verify", "application/json", bytes.NewBuffer(verifyPayload))
 			if err != nil {
-				log.Fatalf("verify request failed: %v", err)
+				fmt.Println(common.TransportError("verify your signup", err))
+				return
 			}
-			body, _ = io.ReadAll(resp.Body)
+			body, err = common.CheckResponse(resp, "verify your signup")
 			resp.Body.Close()
-
-			if resp.StatusCode >= 400 {
-				fmt.Printf("❌ Verification failed: %s\n", string(body))
+			if err != nil {
+				fmt.Println(err)
 				return
 			}
 
@@ -115,11 +113,11 @@ func GetSignupCmd() *cobra.Command {
 				RefreshToken string `json:"refresh_token"`
 			}
 			if err := json.Unmarshal(body, &tokenResp); err != nil || tokenResp.AccessToken == "" {
-				fmt.Println("❌ Failed to parse token response")
+				fmt.Println("Couldn't finish signing up: the API didn't return valid tokens. That's on us; please try again.")
 				return
 			}
 			if err := common.SaveSession(tokenResp.AccessToken, tokenResp.RefreshToken); err != nil {
-				fmt.Println("❌ Failed to save session:", err)
+				fmt.Println("Signed up, but couldn't save your session to disk:", err)
 				return
 			}
 

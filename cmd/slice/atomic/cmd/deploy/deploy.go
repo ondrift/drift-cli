@@ -196,13 +196,12 @@ func syncEnvToBackbone(folder string) ([]string, error) {
 	// Fetch existing Backbone secret names.
 	resp, err := common.DoRequest(http.MethodGet, common.APIBaseURL+"/ops/backbone/secret/list", nil)
 	if err != nil {
-		return nil, fmt.Errorf("could not reach API: %w", err)
+		return nil, common.TransportError("list existing secrets", err)
 	}
 	defer resp.Body.Close()
 
 	var existing []string
-	if resp.StatusCode == http.StatusOK {
-		b, _ := io.ReadAll(resp.Body)
+	if b, err := common.CheckResponse(resp, "list existing secrets"); err == nil {
 		_ = json.Unmarshal(b, &existing)
 	}
 	existingSet := map[string]struct{}{}
@@ -219,7 +218,7 @@ func syncEnvToBackbone(folder string) ([]string, error) {
 	}
 
 	if len(missing) > 0 {
-		fmt.Printf("🔐 Found %d secret(s) in .env not yet in Backbone: %s\n", len(missing), strings.Join(missing, ", "))
+		fmt.Printf("Found %d secret(s) in .env not yet in Backbone: %s\n", len(missing), strings.Join(missing, ", "))
 		fmt.Print("   Push them to Backbone now? [Y/n] ")
 		var answer string
 		fmt.Scanln(&answer)
@@ -229,15 +228,15 @@ func syncEnvToBackbone(folder string) ([]string, error) {
 				body, _ := json.Marshal(map[string]string{"name": k, "value": pairs[k]})
 				r, err := common.DoJSONRequest(http.MethodPost, common.APIBaseURL+"/ops/backbone/secret/set", bytes.NewBuffer(body))
 				if err != nil {
-					fmt.Printf("   ❌ Failed to push %s: %v\n", k, err)
+					fmt.Printf("   %s\n", common.TransportError("push secret "+k, err))
 					continue
 				}
-				r.Body.Close()
-				if r.StatusCode == http.StatusNoContent {
-					fmt.Printf("   ✅ %s pushed to Backbone\n", k)
+				if _, err := common.CheckResponse(r, "push secret "+k); err != nil {
+					fmt.Printf("   %s\n", err)
 				} else {
-					fmt.Printf("   ❌ %s: API returned %d\n", k, r.StatusCode)
+					fmt.Printf("   %s pushed to Backbone\n", k)
 				}
+				r.Body.Close()
 			}
 		}
 	}
@@ -301,13 +300,12 @@ func sendSourceToOperator(name, method, language, auth, element, sourcePath stri
 		&buf,
 	)
 	if err != nil {
-		return fmt.Errorf("upload failed: %w", err)
+		return common.TransportError("deploy the function", err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("deploy rejected (%d): %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	if _, err := common.CheckResponse(resp, "deploy the function"); err != nil {
+		return err
 	}
 
 	return nil

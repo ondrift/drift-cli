@@ -3,7 +3,6 @@ package atomic_cmd
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 
@@ -29,21 +28,21 @@ func Logs() *cobra.Command {
 				nil,
 			)
 			if err != nil {
-				return fmt.Errorf("could not reach API: %w", err)
+				return common.TransportError("fetch logs", err)
 			}
 			defer resp.Body.Close()
 
-			if resp.StatusCode != http.StatusOK {
-				b, _ := io.ReadAll(resp.Body)
-				return fmt.Errorf("API error (%d): %s", resp.StatusCode, string(b))
+			b, err := common.CheckResponse(resp, "fetch logs")
+			if err != nil {
+				return err
 			}
 
 			var entries []struct {
 				Timestamp time.Time `json:"timestamp"`
 				Line      string    `json:"line"`
 			}
-			if err := json.NewDecoder(resp.Body).Decode(&entries); err != nil {
-				return fmt.Errorf("failed to parse response: %w", err)
+			if err := json.Unmarshal(b, &entries); err != nil {
+				return fmt.Errorf("Couldn't fetch logs: the API response didn't look right (%w)", err)
 			}
 
 			if len(entries) == 0 {

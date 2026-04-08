@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 
 	"cli/common"
@@ -36,20 +35,19 @@ func getCreateCmd() *cobra.Command {
 				bytes.NewBuffer(body),
 			)
 			if err != nil {
-				fmt.Println("Failed to contact API:", err)
+				fmt.Println(common.TransportError("create slice", err))
 				return
 			}
 			defer resp.Body.Close()
 
-			respBytes, _ := io.ReadAll(resp.Body)
-			if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-				fmt.Printf("Slice creation failed: %s\n", string(respBytes))
+			if _, err := common.CheckResponse(resp, "create slice"); err != nil {
+				fmt.Println(err)
 				return
 			}
 
 			// Auto-set as active slice.
 			if err := common.SaveActiveSlice(name); err != nil {
-				fmt.Println("Warning: failed to set active slice:", err)
+				fmt.Println("Warning: couldn't mark the new slice as active —", err)
 			}
 
 			fmt.Printf("Slice '%s' created and set as active.\n", name)

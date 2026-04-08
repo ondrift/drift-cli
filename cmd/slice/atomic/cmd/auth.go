@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 
@@ -47,13 +46,12 @@ func authSet() *cobra.Command {
 				bytes.NewReader(body),
 			)
 			if err != nil {
-				return fmt.Errorf("could not reach API: %w", err)
+				return common.TransportError("set the API key", err)
 			}
 			defer resp.Body.Close()
 
-			if resp.StatusCode != http.StatusOK {
-				b, _ := io.ReadAll(resp.Body)
-				return fmt.Errorf("API error (%d): %s", resp.StatusCode, string(b))
+			if _, err := common.CheckResponse(resp, "set the API key"); err != nil {
+				return err
 			}
 
 			fmt.Printf("API key set for %s %s\n", strings.ToUpper(method), function)
@@ -80,13 +78,13 @@ func authList() *cobra.Command {
 				nil,
 			)
 			if err != nil {
-				return fmt.Errorf("could not reach API: %w", err)
+				return common.TransportError("list API keys", err)
 			}
 			defer resp.Body.Close()
 
-			b, _ := io.ReadAll(resp.Body)
-			if resp.StatusCode != http.StatusOK {
-				return fmt.Errorf("API error (%d): %s", resp.StatusCode, string(b))
+			b, err := common.CheckResponse(resp, "list API keys")
+			if err != nil {
+				return err
 			}
 
 			var keys []struct {
@@ -131,13 +129,12 @@ func authRevoke() *cobra.Command {
 				bytes.NewReader(body),
 			)
 			if err != nil {
-				return fmt.Errorf("could not reach API: %w", err)
+				return common.TransportError("revoke the API key", err)
 			}
 			defer resp.Body.Close()
 
-			if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
-				b, _ := io.ReadAll(resp.Body)
-				return fmt.Errorf("API error (%d): %s", resp.StatusCode, string(b))
+			if _, err := common.CheckResponse(resp, "revoke the API key"); err != nil {
+				return err
 			}
 
 			fmt.Printf("API key revoked for %s %s\n", strings.ToUpper(method), function)

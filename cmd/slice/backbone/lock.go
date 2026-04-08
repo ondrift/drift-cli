@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 
 	"cli/common"
@@ -37,22 +36,21 @@ func lockAcquireCmd() *cobra.Command {
 				bytes.NewBuffer(payload),
 			)
 			if err != nil {
-				fmt.Println("❌ Failed to contact API:", err)
+				fmt.Println(common.TransportError("acquire lock", err))
 				return
 			}
 			defer resp.Body.Close()
 
-			b, _ := io.ReadAll(resp.Body)
 			if resp.StatusCode == http.StatusConflict {
-				fmt.Printf("❌ Lock %q is already held\n", name)
+				fmt.Printf("Lock %q is already held.\n", name)
 				return
 			}
-			if resp.StatusCode != http.StatusOK {
-				fmt.Printf("❌ Failed to acquire lock: %s\n", string(b))
+			if _, err := common.CheckResponse(resp, "acquire lock"); err != nil {
+				fmt.Println(err)
 				return
 			}
 
-			fmt.Printf("✅ Lock %q acquired by %q (ttl: %ds)\n", name, owner, ttl)
+			fmt.Printf("Lock %q acquired by %q (ttl: %ds)\n", name, owner, ttl)
 		},
 	}
 	cmd.Flags().IntVar(&ttl, "ttl", 30, "Lock TTL in seconds")
@@ -74,18 +72,17 @@ func lockReleaseCmd() *cobra.Command {
 				bytes.NewBuffer(payload),
 			)
 			if err != nil {
-				fmt.Println("❌ Failed to contact API:", err)
+				fmt.Println(common.TransportError("release lock", err))
 				return
 			}
 			defer resp.Body.Close()
 
-			if resp.StatusCode != http.StatusOK {
-				b, _ := io.ReadAll(resp.Body)
-				fmt.Printf("❌ Failed to release lock: %s\n", string(b))
+			if _, err := common.CheckResponse(resp, "release lock"); err != nil {
+				fmt.Println(err)
 				return
 			}
 
-			fmt.Printf("✅ Lock %q released\n", name)
+			fmt.Printf("Lock %q released\n", name)
 		},
 	}
 }
@@ -106,18 +103,17 @@ func lockRenewCmd() *cobra.Command {
 				bytes.NewBuffer(payload),
 			)
 			if err != nil {
-				fmt.Println("❌ Failed to contact API:", err)
+				fmt.Println(common.TransportError("renew lock", err))
 				return
 			}
 			defer resp.Body.Close()
 
-			if resp.StatusCode != http.StatusOK {
-				b, _ := io.ReadAll(resp.Body)
-				fmt.Printf("❌ Failed to renew lock: %s\n", string(b))
+			if _, err := common.CheckResponse(resp, "renew lock"); err != nil {
+				fmt.Println(err)
 				return
 			}
 
-			fmt.Printf("✅ Lock %q renewed (ttl: %ds)\n", name, ttl)
+			fmt.Printf("Lock %q renewed (ttl: %ds)\n", name, ttl)
 		},
 	}
 	cmd.Flags().IntVar(&ttl, "ttl", 30, "New TTL in seconds")

@@ -2,8 +2,8 @@ package atomic_cmd
 
 import (
 	"fmt"
-	"io"
 	"net/http"
+	"net/url"
 
 	"cli/common"
 
@@ -12,31 +12,30 @@ import (
 
 func Delete() *cobra.Command {
 	return &cobra.Command{
-		Use:     "delete <id>",
-		Short:   "Delete a deployed atomic function (e.g. atomic-1)",
+		Use:     "delete <name>",
+		Short:   "Delete a deployed atomic function by name",
 		GroupID: "operations",
 		Args:    cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			id := args[0]
+			name := args[0]
 
 			resp, err := common.DoRequest(
 				http.MethodDelete,
-				common.APIBaseURL+"/ops/atomic/delete?id="+id,
+				common.APIBaseURL+"/ops/atomic/delete?name="+url.QueryEscape(name),
 				nil,
 			)
 			if err != nil {
-				fmt.Println("❌ Failed to contact API:", err)
+				fmt.Println(common.TransportError("delete atomic function", err))
 				return
 			}
 			defer resp.Body.Close()
 
-			if resp.StatusCode != http.StatusNoContent {
-				b, _ := io.ReadAll(resp.Body)
-				fmt.Printf("❌ Failed to delete function: %s\n", string(b))
+			if _, err := common.CheckResponse(resp, "delete atomic function"); err != nil {
+				fmt.Println(err)
 				return
 			}
 
-			fmt.Printf("✅ Function %q deleted\n", id)
+			fmt.Printf("Function %q deleted.\n", name)
 		},
 	}
 }

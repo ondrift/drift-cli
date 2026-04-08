@@ -3,7 +3,6 @@ package lifecycle
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 
 	"cli/common"
@@ -28,18 +27,18 @@ func getListCmd() *cobra.Command {
 				nil,
 			)
 			if err != nil {
-				return fmt.Errorf("failed to contact API: %w", err)
+				return common.TransportError("list slices", err)
 			}
 			defer resp.Body.Close()
 
-			body, _ := io.ReadAll(resp.Body)
-			if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-				return fmt.Errorf("failed to list slices: %s", string(body))
+			body, err := common.CheckResponse(resp, "list slices")
+			if err != nil {
+				return err
 			}
 
 			var slices []sliceEntry
 			if err := json.Unmarshal(body, &slices); err != nil {
-				return fmt.Errorf("invalid response: %w", err)
+				return fmt.Errorf("Couldn't list slices: the API response didn't look right (%w)", err)
 			}
 
 			active := common.GetActiveSlice()
