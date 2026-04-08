@@ -21,11 +21,11 @@ type usageResource struct {
 
 // usageResponse mirrors the server-side struct.
 type usageResponse struct {
-	Tier         string                   `json:"tier"`
-	TierName     string                   `json:"tier_name"`
-	CostPerMonth int                      `json:"cost_per_month"`
-	Resources    map[string]usageResource `json:"resources"`
-	Limits       map[string]int           `json:"limits"`
+	Slice            string                   `json:"slice"`
+	Tier             string                   `json:"tier"`
+	MonthlyCostCents int                      `json:"monthly_cost_cents"`
+	Resources        map[string]usageResource `json:"resources"`
+	Limits           map[string]int           `json:"limits"`
 }
 
 // planManifest is a minimal parse of a drift.yaml file — just enough to count resources.
@@ -81,16 +81,34 @@ func formatBytes(n int) string {
 	}
 }
 
-func planHeader(tierName string, costPerMonth int) string {
-	if costPerMonth == 0 {
-		return tierName + " plan  ·  free"
+// tierLabel capitalises the tier id for display ("hacker" → "Hacker").
+func tierLabel(tier string) string {
+	if tier == "" {
+		return "Slice"
 	}
-	return fmt.Sprintf("%s plan  ·  €%d/mo", tierName, costPerMonth)
+	return strings.ToUpper(tier[:1]) + tier[1:]
+}
+
+// formatEuros renders a price in cents as a euro string. Whole euros render
+// without a decimal ("€5/mo"); non-whole values show the cents ("€4.50/mo").
+func formatEuros(cents int) string {
+	if cents%100 == 0 {
+		return fmt.Sprintf("€%d", cents/100)
+	}
+	return fmt.Sprintf("€%d.%02d", cents/100, cents%100)
+}
+
+func planHeader(slice, tier string, monthlyCostCents int) string {
+	label := tierLabel(tier)
+	if monthlyCostCents == 0 {
+		return fmt.Sprintf("%s  ·  %s plan  ·  free", slice, label)
+	}
+	return fmt.Sprintf("%s  ·  %s plan  ·  %s/mo", slice, label, formatEuros(monthlyCostCents))
 }
 
 // PrintUsage is shared with GetAccountCmd.
 func PrintUsage(u usageResponse) {
-	fmt.Printf("\n📊  %s\n\n", planHeader(u.TierName, u.CostPerMonth))
+	fmt.Printf("\n📊  %s\n\n", planHeader(u.Slice, u.Tier, u.MonthlyCostCents))
 
 	type row struct {
 		label string
@@ -127,7 +145,7 @@ func PrintUsage(u usageResponse) {
 	fmt.Println(div)
 	fmt.Println()
 	if len(atCapacity) > 0 {
-		fmt.Printf("    %s at capacity — run \"drift slice upgrade prototyper\" for more room.\n",
+		fmt.Printf("    %s at capacity — run \"drift slice resize\" for more room.\n",
 			strings.Join(atCapacity, " and "))
 	}
 	fmt.Printf("    Tip: run \"drift plan <drift.yaml>\" to check a project before deploying.\n\n")
@@ -221,7 +239,7 @@ func printFlightPlan(m planManifest, u usageResponse, manifestPath string) {
 	}
 
 	fmt.Printf("\n📋  \"%s\"  —  deployment plan\n", name)
-	fmt.Printf("    %s\n\n", planHeader(u.TierName, u.CostPerMonth))
+	fmt.Printf("    %s\n\n", planHeader(u.Slice, u.Tier, u.MonthlyCostCents))
 
 	type check struct {
 		label  string
@@ -285,8 +303,8 @@ func printFlightPlan(m planManifest, u usageResponse, manifestPath string) {
 		if issues > 1 {
 			noun = "resources"
 		}
-		fmt.Printf("    ❌  %d %s would exceed your %s plan quota.\n", issues, noun, u.TierName)
-		fmt.Printf("        Upgrade: drift slice upgrade prototyper\n\n")
+		fmt.Printf("    ❌  %d %s would exceed your %s plan quota.\n", issues, noun, tierLabel(u.Tier))
+		fmt.Printf("        Resize: drift slice resize --functions N ...\n\n")
 	case warnings > 0:
 		fmt.Printf("    ⚠️   Some resources will be at capacity after this deployment.\n")
 		fmt.Printf("        Ready to go — run \"drift deploy %s\" when you're ready.\n\n", manifestPath)

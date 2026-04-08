@@ -12,31 +12,37 @@ import (
 )
 
 func getDeleteCmd() *cobra.Command {
-	return &cobra.Command{
+	var yes bool
+	deleteCmd := &cobra.Command{
 		Use:   "delete <name>",
 		Short: "Delete a slice and everything in it (irreversible)",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			name := args[0]
 
-			printDeleteWarning(name)
+			// --yes skips both interactive confirmations. The slice name
+			// still has to match the argv, which preserves the "you must
+			// spell it out" safety of the interactive flow.
+			if !yes {
+				printDeleteWarning(name)
 
-			// First confirmation: plain yes/no.
-			first := strings.ToLower(strings.TrimSpace(
-				common.PromptForInput("Proceed with deletion? [y/N]"),
-			))
-			if first != "y" && first != "yes" {
-				fmt.Println("Deletion cancelled.")
-				return
-			}
+				// First confirmation: plain yes/no.
+				first := strings.ToLower(strings.TrimSpace(
+					common.PromptForInput("Proceed with deletion? [y/N]"),
+				))
+				if first != "y" && first != "yes" {
+					fmt.Println("Deletion cancelled.")
+					return
+				}
 
-			// Second confirmation: type the slice name verbatim.
-			typed := strings.TrimSpace(
-				common.PromptForInput(fmt.Sprintf("Type '%s' to confirm", name)),
-			)
-			if typed != name {
-				fmt.Println("Deletion cancelled — name did not match.")
-				return
+				// Second confirmation: type the slice name verbatim.
+				typed := strings.TrimSpace(
+					common.PromptForInput(fmt.Sprintf("Type '%s' to confirm", name)),
+				)
+				if typed != name {
+					fmt.Println("Deletion cancelled — name did not match.")
+					return
+				}
 			}
 
 			resp, err := common.DoRequest(
@@ -63,6 +69,9 @@ func getDeleteCmd() *cobra.Command {
 			fmt.Printf("Slice '%s' deleted.\n", name)
 		},
 	}
+
+	deleteCmd.Flags().BoolVar(&yes, "yes", false, "Skip confirmation prompts (for scripts). The slice name argument must still match exactly.")
+	return deleteCmd
 }
 
 // printDeleteWarning spells out exactly what will be destroyed so the user
