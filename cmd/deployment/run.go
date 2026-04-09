@@ -1,4 +1,4 @@
-package deploy
+package deployment
 
 import (
 	"bytes"
@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"time"
 
-	atomic_cmd "cli/cmd/slice/atomic/cmd/deploy"
-	atomic_common "cli/cmd/slice/atomic/common"
+	atomic_cmd "cli/cmd/atomic/cmd/deploy"
+	atomic_common "cli/cmd/atomic/common"
 	"cli/common"
 
 	"github.com/spf13/cobra"
@@ -19,7 +19,7 @@ import (
 
 // Manifest is the top-level structure of a drift.yaml deployment file.
 type Manifest struct {
-	Name     string       `yaml:"name"`
+	Name     string        `yaml:"name"`
 	Canvas   []CanvasEntry `yaml:"canvas"`
 	Atomic   []AtomicEntry `yaml:"atomic"`
 	Backbone BackboneSpec  `yaml:"backbone"`
@@ -70,18 +70,17 @@ type SecretEntry struct {
 	Env   string `yaml:"env"`
 }
 
-func GetDeployCmd() *cobra.Command {
+func getRunCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:     "deploy [drift.yaml]",
-		Short:   "Deploy all resources declared in a drift.yaml manifest",
-		GroupID: "services",
-		Args:    cobra.ExactArgs(1),
+		Use:   "run",
+		Short: "Deploy all resources declared in a drift.yaml manifest",
+		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if _, err := common.RequireActiveSlice(); err != nil {
 				return err
 			}
 
-			manifestPath, err := filepath.Abs(args[0])
+			manifestPath, err := filepath.Abs(filepath.Join(".", "drift.yaml"))
 			if err != nil {
 				return fmt.Errorf("failed to resolve manifest path: %w", err)
 			}

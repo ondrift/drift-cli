@@ -1,4 +1,4 @@
-package lifecycle
+package slice
 
 import (
 	account "cli/cmd/account"

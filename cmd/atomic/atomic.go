@@ -3,10 +3,10 @@ package atomic
 import (
 	"github.com/spf13/cobra"
 
-	cmd "cli/cmd/slice/atomic/cmd"
-	cmd_deploy "cli/cmd/slice/atomic/cmd/deploy"
-	cmd_new "cli/cmd/slice/atomic/cmd/new"
-	cmd_run "cli/cmd/slice/atomic/cmd/run"
+	cmd "cli/cmd/atomic/cmd"
+	cmd_deploy "cli/cmd/atomic/cmd/deploy"
+	cmd_new "cli/cmd/atomic/cmd/new"
+	cmd_run "cli/cmd/atomic/cmd/run"
 )
 
 func GetCmd() *cobra.Command {

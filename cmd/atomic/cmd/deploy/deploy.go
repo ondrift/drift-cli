@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	atomic_common "cli/cmd/slice/atomic/common"
+	atomic_common "cli/cmd/atomic/common"
 	"cli/common"
 
 	"github.com/spf13/cobra"
@@ -136,7 +136,6 @@ func parseScheduleComments(dir string) ([]TriggerSpec, error) {
 	}
 	return triggers, nil
 }
-
 
 // readDotEnvKeys parses a .env file and returns only the key names.
 func readDotEnvKeys(path string) ([]string, error) {

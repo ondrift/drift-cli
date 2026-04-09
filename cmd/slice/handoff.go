@@ -14,7 +14,7 @@
 // scripts that pipe through ssh). It is intentionally less ergonomic than
 // the browser flow — the user has to know the exact tier name or pass the
 // full SliceConfig as a JSON file.
-package lifecycle
+package slice
 
 import (
 	"bytes"

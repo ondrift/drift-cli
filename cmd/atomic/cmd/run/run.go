@@ -17,7 +17,7 @@ import (
 	"sync"
 	"time"
 
-	atomic_common "cli/cmd/slice/atomic/common"
+	atomic_common "cli/cmd/atomic/common"
 	"cli/common"
 
 	"github.com/fsnotify/fsnotify"

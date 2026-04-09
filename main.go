@@ -5,11 +5,11 @@ import (
 	"os"
 
 	account "cli/cmd/account"
-	deploy "cli/cmd/deploy"
-	atomic "cli/cmd/slice/atomic"
-	backbone "cli/cmd/slice/backbone"
-	canvas "cli/cmd/slice/canvas"
-	lifecycle "cli/cmd/slice/lifecycle"
+	atomic "cli/cmd/atomic"
+	backbone "cli/cmd/backbone"
+	canvas "cli/cmd/canvas"
+	deployment "cli/cmd/deployment"
+	slice "cli/cmd/slice"
 
 	"github.com/spf13/cobra"
 )
@@ -32,9 +32,14 @@ func main() {
 		Title: "Account:",
 	})
 
+	rootCmd.AddGroup(&cobra.Group{
+		ID:    "deployment",
+		Title: "Deployment:",
+	})
+
 	rootCmd.AddCommand(
 		// Declarative deployment
-		deploy.GetDeployCmd(),
+		deployment.GetCmd(),
 
 		// Deployment planning
 		account.GetPlanCmd(),
@@ -49,7 +54,7 @@ func main() {
 		backbone.GetCmd(),
 
 		// Slice lifecycle (create, list, use, delete, upgrade)
-		lifecycle.GetCmd(),
+		slice.GetCmd(),
 
 		// Account (signup, login, usage, upgrade)
 		account.GetAccountCmd(),

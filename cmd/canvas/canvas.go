@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	slate_cmd "cli/cmd/slice/canvas/cmd"
+	slate_cmd "cli/cmd/canvas/cmd"
 
 	"github.com/spf13/cobra"
 )
