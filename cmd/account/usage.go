@@ -13,7 +13,7 @@ func GetAccountCmd() *cobra.Command {
 		GroupID: "account",
 	}
 	cmd.AddCommand(
-		GetSignupCmd(),
+		GetCreateCmd(),
 		GetLoginCmd(),
 	)
 	return cmd

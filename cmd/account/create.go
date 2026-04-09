@@ -18,12 +18,12 @@ func HashPassword(password string) (string, error) {
 	return string(bytes), err
 }
 
-func GetSignupCmd() *cobra.Command {
+func GetCreateCmd() *cobra.Command {
 	var username, password, email string
 
-	signupCmd := &cobra.Command{
-		Use:   "signup",
-		Short: "Signup to Drift",
+	createCmd := &cobra.Command{
+		Use:   "create",
+		Short: "Create a new account",
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			if username == "" {
@@ -133,9 +133,9 @@ func GetSignupCmd() *cobra.Command {
 		Example: "drift signup",
 	}
 
-	signupCmd.Flags().StringVarP(&username, "username", "u", "", "Username (skips interactive prompt)")
-	signupCmd.Flags().StringVarP(&email, "email", "e", "", "Email address (skips interactive prompt)")
-	signupCmd.Flags().StringVarP(&password, "password", "p", "", "Password (skips interactive prompt and repeat)")
+	createCmd.Flags().StringVarP(&username, "username", "u", "", "Username (skips interactive prompt)")
+	createCmd.Flags().StringVarP(&email, "email", "e", "", "Email address (skips interactive prompt)")
+	createCmd.Flags().StringVarP(&password, "password", "p", "", "Password (skips interactive prompt and repeat)")
 
-	return signupCmd
+	return createCmd
 }
