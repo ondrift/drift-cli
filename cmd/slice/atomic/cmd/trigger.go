@@ -33,28 +33,29 @@ func triggerListCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List all registered triggers",
 		Args:  cobra.NoArgs,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			resp, err := common.DoRequest(
 				http.MethodGet,
 				common.APIBaseURL+"/ops/trigger/list",
 				nil,
 			)
 			if err != nil {
-				fmt.Println(common.TransportError("list triggers", err))
-				return
+				e := common.TransportError("list triggers", err)
+				fmt.Println(e)
+				return e
 			}
 			defer resp.Body.Close()
 
 			b, err := common.CheckResponse(resp, "list triggers")
 			if err != nil {
 				fmt.Println(err)
-				return
+				return err
 			}
 
 			var triggers []map[string]any
 			if err := json.Unmarshal(b, &triggers); err != nil || len(triggers) == 0 {
 				fmt.Println("No triggers registered.")
-				return
+				return nil
 			}
 
 			fmt.Printf("%-32s  %-10s  %s\n", "NAME", "TYPE", "SOURCE / SCHEDULE")
@@ -73,6 +74,7 @@ func triggerListCmd() *cobra.Command {
 				}
 				fmt.Printf("%-32s  %-10s  %s\n", name, typ, detail)
 			}
+			return nil
 		},
 	}
 }
@@ -84,7 +86,7 @@ func triggerRegisterQueueCmd() *cobra.Command {
 		Use:   "queue <name>",
 		Short: "Register a queue trigger — polls a Backbone queue and invokes a function on each message",
 		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
 
 			payload, _ := json.Marshal(map[string]any{
@@ -101,17 +103,19 @@ func triggerRegisterQueueCmd() *cobra.Command {
 				bytes.NewBuffer(payload),
 			)
 			if err != nil {
-				fmt.Println(common.TransportError("register the queue trigger", err))
-				return
+				e := common.TransportError("register the queue trigger", err)
+				fmt.Println(e)
+				return e
 			}
 			defer resp.Body.Close()
 
 			if _, err := common.CheckResponse(resp, "register the queue trigger"); err != nil {
 				fmt.Println(err)
-				return
+				return err
 			}
 
 			fmt.Printf("Queue trigger %q registered (queue: %s, poll: %dms)\n", name, queue, pollMS)
+			return nil
 		},
 	}
 	cmd.Flags().StringVar(&queue, "queue", "", "Backbone queue name to watch (required)")
@@ -129,7 +133,7 @@ func triggerRegisterScheduleCmd() *cobra.Command {
 		Use:   "schedule <name>",
 		Short: "Register a cron schedule trigger (5-field: minute hour dom month dow)",
 		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
 
 			payload, _ := json.Marshal(map[string]any{
@@ -144,17 +148,19 @@ func triggerRegisterScheduleCmd() *cobra.Command {
 				bytes.NewBuffer(payload),
 			)
 			if err != nil {
-				fmt.Println(common.TransportError("register the schedule trigger", err))
-				return
+				e := common.TransportError("register the schedule trigger", err)
+				fmt.Println(e)
+				return e
 			}
 			defer resp.Body.Close()
 
 			if _, err := common.CheckResponse(resp, "register the schedule trigger"); err != nil {
 				fmt.Println(err)
-				return
+				return err
 			}
 
 			fmt.Printf("Schedule trigger %q registered (cron: %s)\n", name, cron)
+			return nil
 		},
 	}
 	cmd.Flags().StringVar(&cron, "cron", "", "5-field cron expression, e.g. \"*/5 * * * *\" (required)")
@@ -169,7 +175,7 @@ func triggerUnregisterCmd() *cobra.Command {
 		Use:   "unregister <name>",
 		Short: "Unregister a trigger by name",
 		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
 
 			payload, _ := json.Marshal(map[string]string{"name": name})
@@ -179,17 +185,19 @@ func triggerUnregisterCmd() *cobra.Command {
 				bytes.NewBuffer(payload),
 			)
 			if err != nil {
-				fmt.Println(common.TransportError("unregister the trigger", err))
-				return
+				e := common.TransportError("unregister the trigger", err)
+				fmt.Println(e)
+				return e
 			}
 			defer resp.Body.Close()
 
 			if _, err := common.CheckResponse(resp, "unregister the trigger"); err != nil {
 				fmt.Println(err)
-				return
+				return err
 			}
 
 			fmt.Printf("Trigger %q unregistered\n", name)
+			return nil
 		},
 	}
 }

@@ -15,6 +15,13 @@ const SessionFile = "~/.drift/session.json"
 //	go build -ldflags "-X cli/common.APIBaseURL=https://api.ondrift.eu"
 var APIBaseURL = "http://api.localhost:30036"
 
+// ConfiguratorBaseURL is the base URL for the configurator service. The CLI
+// hits this directly (rather than via the api gateway) for the slice
+// create/resize browser handoff: handoff mints a session, redeem polls for
+// the result. Like APIBaseURL the default targets the local NodePort and
+// production builds override it via -ldflags.
+var ConfiguratorBaseURL = "http://localhost:30038"
+
 type Session struct {
 	Username    string `json:"username"`
 	ActiveSlice string `json:"active_slice,omitempty"`

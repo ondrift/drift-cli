@@ -25,13 +25,14 @@ func queuePushCmd() *cobra.Command {
 		Use:   "push <name> <json>",
 		Short: "Push a JSON message onto a queue",
 		Args:  cobra.ExactArgs(2),
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			name, rawJSON := args[0], args[1]
 
 			var body map[string]any
 			if err := json.Unmarshal([]byte(rawJSON), &body); err != nil {
-				fmt.Println("Couldn't push message: that doesn't look like valid JSON —", err)
-				return
+				e := fmt.Errorf("Couldn't push message: that doesn't look like valid JSON — %v", err)
+				fmt.Println(e)
+				return e
 			}
 
 			payload, _ := json.Marshal(map[string]any{"queue": name, "body": body})
@@ -41,15 +42,16 @@ func queuePushCmd() *cobra.Command {
 				bytes.NewBuffer(payload),
 			)
 			if err != nil {
-				fmt.Println(common.TransportError("push message", err))
-				return
+				e := common.TransportError("push message", err)
+				fmt.Println(e)
+				return e
 			}
 			defer resp.Body.Close()
 
 			b, err := common.CheckResponse(resp, "push message")
 			if err != nil {
 				fmt.Println(err)
-				return
+				return err
 			}
 
 			var result map[string]string
@@ -58,6 +60,7 @@ func queuePushCmd() *cobra.Command {
 			} else {
 				fmt.Println("Message pushed")
 			}
+			return nil
 		},
 	}
 }
@@ -67,28 +70,30 @@ func queuePopCmd() *cobra.Command {
 		Use:   "pop <name>",
 		Short: "Pop the next message from a queue",
 		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
 
 			url := fmt.Sprintf("%s/ops/backbone/queue/pop?queue=%s", common.APIBaseURL, name)
 			resp, err := common.DoRequest(http.MethodPost, url, nil)
 			if err != nil {
-				fmt.Println(common.TransportError("pop message", err))
-				return
+				e := common.TransportError("pop message", err)
+				fmt.Println(e)
+				return e
 			}
 			defer resp.Body.Close()
 
 			if resp.StatusCode == http.StatusNoContent {
 				fmt.Println("Queue is empty.")
-				return
+				return nil
 			}
 
 			b, err := common.CheckResponse(resp, "pop message")
 			if err != nil {
 				fmt.Println(err)
-				return
+				return err
 			}
 			fmt.Println(string(b))
+			return nil
 		},
 	}
 }
@@ -98,28 +103,30 @@ func queuePeekCmd() *cobra.Command {
 		Use:   "peek <name>",
 		Short: "Peek at the next message without removing it",
 		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
 
 			url := fmt.Sprintf("%s/ops/backbone/queue/peek?queue=%s", common.APIBaseURL, name)
 			resp, err := common.DoRequest(http.MethodGet, url, nil)
 			if err != nil {
-				fmt.Println(common.TransportError("peek queue", err))
-				return
+				e := common.TransportError("peek queue", err)
+				fmt.Println(e)
+				return e
 			}
 			defer resp.Body.Close()
 
 			if resp.StatusCode == http.StatusNoContent {
 				fmt.Println("Queue is empty.")
-				return
+				return nil
 			}
 
 			b, err := common.CheckResponse(resp, "peek queue")
 			if err != nil {
 				fmt.Println(err)
-				return
+				return err
 			}
 			fmt.Println(string(b))
+			return nil
 		},
 	}
 }
@@ -129,22 +136,24 @@ func queueDropCmd() *cobra.Command {
 		Use:   "drop <name>",
 		Short: "Delete a queue and all its messages",
 		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
 
 			url := fmt.Sprintf("%s/ops/backbone/queue/drop?queue=%s", common.APIBaseURL, name)
 			resp, err := common.DoRequest(http.MethodPost, url, nil)
 			if err != nil {
-				fmt.Println(common.TransportError("drop queue", err))
-				return
+				e := common.TransportError("drop queue", err)
+				fmt.Println(e)
+				return e
 			}
 			defer resp.Body.Close()
 
 			if _, err := common.CheckResponse(resp, "drop queue"); err != nil {
 				fmt.Println(err)
-				return
+				return err
 			}
 			fmt.Printf("Queue %q dropped\n", name)
+			return nil
 		},
 	}
 }
@@ -154,21 +163,22 @@ func queueLenCmd() *cobra.Command {
 		Use:   "len <name>",
 		Short: "Print the number of messages in a queue",
 		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
 
 			url := fmt.Sprintf("%s/ops/backbone/queue/len?queue=%s", common.APIBaseURL, name)
 			resp, err := common.DoRequest(http.MethodGet, url, nil)
 			if err != nil {
-				fmt.Println(common.TransportError("get queue length", err))
-				return
+				e := common.TransportError("get queue length", err)
+				fmt.Println(e)
+				return e
 			}
 			defer resp.Body.Close()
 
 			b, err := common.CheckResponse(resp, "get queue length")
 			if err != nil {
 				fmt.Println(err)
-				return
+				return err
 			}
 
 			var result map[string]int
@@ -177,6 +187,7 @@ func queueLenCmd() *cobra.Command {
 			} else {
 				fmt.Println(string(b))
 			}
+			return nil
 		},
 	}
 }

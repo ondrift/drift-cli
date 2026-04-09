@@ -26,30 +26,33 @@ func blobPutCmd() *cobra.Command {
 		Use:   "put <bucket> <key> <file>",
 		Short: "Upload a file to a blob bucket",
 		Args:  cobra.ExactArgs(3),
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			bucket, key, file := args[0], args[1], args[2]
 
 			f, err := os.Open(file)
 			if err != nil {
-				fmt.Printf("Couldn't put blob: failed to open %s (%v)\n", file, err)
-				return
+				e := fmt.Errorf("Couldn't put blob: failed to open %s (%v)", file, err)
+				fmt.Println(e)
+				return e
 			}
 			defer f.Close()
 
 			url := fmt.Sprintf("%s/ops/backbone/blob/put?bucket=%s&key=%s", common.APIBaseURL, bucket, key)
 			resp, err := common.DoRequestWithContentType(http.MethodPost, url, "application/octet-stream", f)
 			if err != nil {
-				fmt.Println(common.TransportError("put blob", err))
-				return
+				e := common.TransportError("put blob", err)
+				fmt.Println(e)
+				return e
 			}
 			defer resp.Body.Close()
 
 			if _, err := common.CheckResponse(resp, "put blob"); err != nil {
 				fmt.Println(err)
-				return
+				return err
 			}
 
 			fmt.Printf("Blob stored at %s/%s\n", bucket, key)
+			return nil
 		},
 	}
 }
@@ -90,31 +93,33 @@ func blobListCmd() *cobra.Command {
 		Use:   "list <bucket>",
 		Short: "List keys in a blob bucket",
 		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			bucket := args[0]
 
 			url := fmt.Sprintf("%s/ops/backbone/blob/list?bucket=%s", common.APIBaseURL, bucket)
 			resp, err := common.DoRequest(http.MethodGet, url, nil)
 			if err != nil {
-				fmt.Println(common.TransportError("list blobs", err))
-				return
+				e := common.TransportError("list blobs", err)
+				fmt.Println(e)
+				return e
 			}
 			defer resp.Body.Close()
 
 			b, err := common.CheckResponse(resp, "list blobs")
 			if err != nil {
 				fmt.Println(err)
-				return
+				return err
 			}
 
 			var keys []string
 			if err := json.Unmarshal(b, &keys); err != nil || len(keys) == 0 {
 				fmt.Println("No blobs in bucket.")
-				return
+				return nil
 			}
 			for _, k := range keys {
 				fmt.Println(k)
 			}
+			return nil
 		},
 	}
 }
@@ -124,23 +129,25 @@ func blobDeleteCmd() *cobra.Command {
 		Use:   "delete <bucket> <key>",
 		Short: "Delete a blob",
 		Args:  cobra.ExactArgs(2),
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			bucket, key := args[0], args[1]
 
 			url := fmt.Sprintf("%s/ops/backbone/blob/delete?bucket=%s&key=%s", common.APIBaseURL, bucket, key)
 			resp, err := common.DoRequest(http.MethodPost, url, nil)
 			if err != nil {
-				fmt.Println(common.TransportError("delete blob", err))
-				return
+				e := common.TransportError("delete blob", err)
+				fmt.Println(e)
+				return e
 			}
 			defer resp.Body.Close()
 
 			if _, err := common.CheckResponse(resp, "delete blob"); err != nil {
 				fmt.Println(err)
-				return
+				return err
 			}
 
 			fmt.Printf("Blob %s/%s deleted\n", bucket, key)
+			return nil
 		},
 	}
 }

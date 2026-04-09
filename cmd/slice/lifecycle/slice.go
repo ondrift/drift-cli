@@ -11,10 +11,10 @@ func GetCmd() *cobra.Command {
 	}
 	cmd.AddCommand(
 		getCreateCmd(),
+		getResizeCmd(),
 		getListCmd(),
 		getUseCmd(),
 		getDeleteCmd(),
-		getUpgradeCmd(),
 		getPlanCmd(),
 	)
 	return cmd

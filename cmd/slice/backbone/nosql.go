@@ -26,16 +26,18 @@ func nosqlWriteCmd() *cobra.Command {
 		Use:   "write",
 		Short: "Write a JSON document to a collection",
 		Args:  cobra.NoArgs,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if data == "" {
-				fmt.Println("Couldn't write document: --data is required.")
-				return
+				e := fmt.Errorf("Couldn't write document: --data is required.")
+				fmt.Println(e)
+				return e
 			}
 
 			var body map[string]any
 			if err := json.Unmarshal([]byte(data), &body); err != nil {
-				fmt.Println("Couldn't write document: that doesn't look like valid JSON —", err)
-				return
+				e := fmt.Errorf("Couldn't write document: that doesn't look like valid JSON — %v", err)
+				fmt.Println(e)
+				return e
 			}
 			if collection != "" {
 				body["collection"] = collection
@@ -48,14 +50,15 @@ func nosqlWriteCmd() *cobra.Command {
 				bytes.NewBuffer(payload),
 			)
 			if err != nil {
-				fmt.Println(common.TransportError("write document", err))
-				return
+				e := common.TransportError("write document", err)
+				fmt.Println(e)
+				return e
 			}
 			defer resp.Body.Close()
 
 			if _, err := common.CheckResponse(resp, "write document"); err != nil {
 				fmt.Println(err)
-				return
+				return err
 			}
 
 			if collection != "" {
@@ -63,6 +66,7 @@ func nosqlWriteCmd() *cobra.Command {
 			} else {
 				fmt.Println("Document written")
 			}
+			return nil
 		},
 	}
 	cmd.Flags().StringVar(&collection, "collection", "", "Collection name (default: \"default\")")
@@ -76,22 +80,24 @@ func nosqlDropCmd() *cobra.Command {
 		Use:   "drop <collection>",
 		Short: "Delete a NoSQL collection and all its documents",
 		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
 
 			url := fmt.Sprintf("%s/ops/backbone/nosql/drop?collection=%s", common.APIBaseURL, name)
 			resp, err := common.DoRequest(http.MethodPost, url, nil)
 			if err != nil {
-				fmt.Println(common.TransportError("drop collection", err))
-				return
+				e := common.TransportError("drop collection", err)
+				fmt.Println(e)
+				return e
 			}
 			defer resp.Body.Close()
 
 			if _, err := common.CheckResponse(resp, "drop collection"); err != nil {
 				fmt.Println(err)
-				return
+				return err
 			}
 			fmt.Printf("Collection %q dropped\n", name)
+			return nil
 		},
 	}
 }
@@ -103,7 +109,7 @@ func nosqlListCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List all documents in a collection, with optional field filtering",
 		Args:  cobra.NoArgs,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			url := fmt.Sprintf("%s/ops/backbone/nosql/list?collection=%s&limit=%d", common.APIBaseURL, collection, limit)
 			if field != "" && value != "" {
 				url += "&field=" + field + "&value=" + value
@@ -111,27 +117,28 @@ func nosqlListCmd() *cobra.Command {
 
 			resp, err := common.DoRequest(http.MethodGet, url, nil)
 			if err != nil {
-				fmt.Println(common.TransportError("list documents", err))
-				return
+				e := common.TransportError("list documents", err)
+				fmt.Println(e)
+				return e
 			}
 			defer resp.Body.Close()
 
 			b, err := common.CheckResponse(resp, "list documents")
 			if err != nil {
 				fmt.Println(err)
-				return
+				return err
 			}
 
 			// Pretty-print the JSON array.
 			var docs []json.RawMessage
 			if err := json.Unmarshal(b, &docs); err != nil {
 				fmt.Println(string(b))
-				return
+				return nil
 			}
 
 			if len(docs) == 0 {
 				fmt.Println("(no documents)")
-				return
+				return nil
 			}
 
 			for _, doc := range docs {
@@ -140,6 +147,7 @@ func nosqlListCmd() *cobra.Command {
 				fmt.Println(pretty.String())
 			}
 			fmt.Printf("\n%d document(s)\n", len(docs))
+			return nil
 		},
 	}
 	cmd.Flags().StringVar(&collection, "collection", "default", "Collection name")
@@ -155,10 +163,11 @@ func nosqlReadCmd() *cobra.Command {
 		Use:   "read",
 		Short: "Read a document by key from a collection",
 		Args:  cobra.NoArgs,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if key == "" {
-				fmt.Println("Couldn't read document: --key is required.")
-				return
+				e := fmt.Errorf("Couldn't read document: --key is required.")
+				fmt.Println(e)
+				return e
 			}
 
 			url := fmt.Sprintf("%s/ops/backbone/read?key=%s", common.APIBaseURL, key)
@@ -168,18 +177,20 @@ func nosqlReadCmd() *cobra.Command {
 
 			resp, err := common.DoRequest(http.MethodGet, url, nil)
 			if err != nil {
-				fmt.Println(common.TransportError("read document", err))
-				return
+				e := common.TransportError("read document", err)
+				fmt.Println(e)
+				return e
 			}
 			defer resp.Body.Close()
 
 			b, err := common.CheckResponse(resp, "read document")
 			if err != nil {
 				fmt.Println(err)
-				return
+				return err
 			}
 
 			fmt.Println(string(b))
+			return nil
 		},
 	}
 	cmd.Flags().StringVar(&collection, "collection", "", "Collection name (default: \"default\")")

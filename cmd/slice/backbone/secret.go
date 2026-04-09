@@ -26,11 +26,12 @@ func secretSetCmd() *cobra.Command {
 		Use:   "set KEY=VALUE",
 		Short: "Store an encrypted secret",
 		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			parts := strings.SplitN(args[0], "=", 2)
 			if len(parts) != 2 || parts[0] == "" {
-				fmt.Println("Couldn't store secret: argument must be in KEY=VALUE format.")
-				return
+				e := fmt.Errorf("Couldn't store secret: argument must be in KEY=VALUE format.")
+				fmt.Println(e)
+				return e
 			}
 			name, value := parts[0], parts[1]
 
@@ -41,17 +42,19 @@ func secretSetCmd() *cobra.Command {
 				bytes.NewBuffer(body),
 			)
 			if err != nil {
-				fmt.Println(common.TransportError("store secret", err))
-				return
+				e := common.TransportError("store secret", err)
+				fmt.Println(e)
+				return e
 			}
 			defer resp.Body.Close()
 
 			if _, err := common.CheckResponse(resp, "store secret"); err != nil {
 				fmt.Println(err)
-				return
+				return err
 			}
 
 			fmt.Printf("Secret %q stored\n", name)
+			return nil
 		},
 	}
 }
@@ -61,25 +64,27 @@ func secretGetCmd() *cobra.Command {
 		Use:   "get KEY",
 		Short: "Retrieve the value of a secret",
 		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			resp, err := common.DoRequest(
 				http.MethodGet,
 				common.APIBaseURL+"/ops/backbone/secret/get?name="+args[0],
 				nil,
 			)
 			if err != nil {
-				fmt.Println(common.TransportError("get secret", err))
-				return
+				e := common.TransportError("get secret", err)
+				fmt.Println(e)
+				return e
 			}
 			defer resp.Body.Close()
 
 			b, err := common.CheckResponse(resp, "get secret")
 			if err != nil {
 				fmt.Println(err)
-				return
+				return err
 			}
 
 			fmt.Println(string(b))
+			return nil
 		},
 	}
 }
@@ -89,32 +94,34 @@ func secretListCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List secret names",
 		Args:  cobra.NoArgs,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			resp, err := common.DoRequest(
 				http.MethodGet,
 				common.APIBaseURL+"/ops/backbone/secret/list",
 				nil,
 			)
 			if err != nil {
-				fmt.Println(common.TransportError("list secrets", err))
-				return
+				e := common.TransportError("list secrets", err)
+				fmt.Println(e)
+				return e
 			}
 			defer resp.Body.Close()
 
 			b, err := common.CheckResponse(resp, "list secrets")
 			if err != nil {
 				fmt.Println(err)
-				return
+				return err
 			}
 
 			var names []string
 			if err := json.Unmarshal(b, &names); err != nil || len(names) == 0 {
 				fmt.Println("No secrets stored.")
-				return
+				return nil
 			}
 			for _, n := range names {
 				fmt.Println(n)
 			}
+			return nil
 		},
 	}
 }
@@ -124,7 +131,7 @@ func secretDeleteCmd() *cobra.Command {
 		Use:   "delete KEY",
 		Short: "Delete a secret",
 		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			body, _ := json.Marshal(map[string]string{"name": args[0]})
 			resp, err := common.DoJSONRequest(
 				http.MethodDelete,
@@ -132,17 +139,19 @@ func secretDeleteCmd() *cobra.Command {
 				bytes.NewBuffer(body),
 			)
 			if err != nil {
-				fmt.Println(common.TransportError("delete secret", err))
-				return
+				e := common.TransportError("delete secret", err)
+				fmt.Println(e)
+				return e
 			}
 			defer resp.Body.Close()
 
 			if _, err := common.CheckResponse(resp, "delete secret"); err != nil {
 				fmt.Println(err)
-				return
+				return err
 			}
 
 			fmt.Printf("Secret %q deleted\n", args[0])
+			return nil
 		},
 	}
 }

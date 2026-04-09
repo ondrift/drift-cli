@@ -26,7 +26,7 @@ func cacheSetCmd() *cobra.Command {
 		Use:   "set <key> <value>",
 		Short: "Set a cache key",
 		Args:  cobra.ExactArgs(2),
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			key, value := args[0], args[1]
 
 			payload, _ := json.Marshal(map[string]any{"key": key, "value": value, "ttl": ttl})
@@ -36,14 +36,15 @@ func cacheSetCmd() *cobra.Command {
 				bytes.NewBuffer(payload),
 			)
 			if err != nil {
-				fmt.Println(common.TransportError("set cache key", err))
-				return
+				e := common.TransportError("set cache key", err)
+				fmt.Println(e)
+				return e
 			}
 			defer resp.Body.Close()
 
 			if _, err := common.CheckResponse(resp, "set cache key"); err != nil {
 				fmt.Println(err)
-				return
+				return err
 			}
 
 			if ttl > 0 {
@@ -51,6 +52,7 @@ func cacheSetCmd() *cobra.Command {
 			} else {
 				fmt.Printf("%q set (no expiry)\n", key)
 			}
+			return nil
 		},
 	}
 	cmd.Flags().IntVar(&ttl, "ttl", 0, "TTL in seconds (0 = no expiry)")
@@ -62,7 +64,7 @@ func cacheGetCmd() *cobra.Command {
 		Use:   "get <key>",
 		Short: "Get a cache value",
 		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			key := args[0]
 
 			resp, err := common.DoRequest(
@@ -71,21 +73,24 @@ func cacheGetCmd() *cobra.Command {
 				nil,
 			)
 			if err != nil {
-				fmt.Println(common.TransportError("get cache key", err))
-				return
+				e := common.TransportError("get cache key", err)
+				fmt.Println(e)
+				return e
 			}
 			defer resp.Body.Close()
 
 			if resp.StatusCode == http.StatusNotFound {
-				fmt.Printf("Key %q not found.\n", key)
-				return
+				e := fmt.Errorf("Key %q not found.", key)
+				fmt.Println(e)
+				return e
 			}
 			b, err := common.CheckResponse(resp, "get cache key")
 			if err != nil {
 				fmt.Println(err)
-				return
+				return err
 			}
 			fmt.Println(string(b))
+			return nil
 		},
 	}
 }
@@ -95,7 +100,7 @@ func cacheDelCmd() *cobra.Command {
 		Use:   "del <key>",
 		Short: "Delete a cache key",
 		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			key := args[0]
 
 			payload, _ := json.Marshal(map[string]string{"key": key})
@@ -105,21 +110,23 @@ func cacheDelCmd() *cobra.Command {
 				bytes.NewBuffer(payload),
 			)
 			if err != nil {
-				fmt.Println(common.TransportError("delete cache key", err))
-				return
+				e := common.TransportError("delete cache key", err)
+				fmt.Println(e)
+				return e
 			}
 			defer resp.Body.Close()
 
 			if resp.StatusCode == http.StatusNotFound {
 				fmt.Printf("Key %q not found.\n", key)
-				return
+				return nil
 			}
 			if _, err := common.CheckResponse(resp, "delete cache key"); err != nil {
 				fmt.Println(err)
-				return
+				return err
 			}
 
 			fmt.Printf("%q deleted\n", key)
+			return nil
 		},
 	}
 }
@@ -129,7 +136,7 @@ func cacheExistsCmd() *cobra.Command {
 		Use:   "exists <key>",
 		Short: "Check whether a cache key exists",
 		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			key := args[0]
 
 			resp, err := common.DoRequest(
@@ -138,22 +145,24 @@ func cacheExistsCmd() *cobra.Command {
 				nil,
 			)
 			if err != nil {
-				fmt.Println(common.TransportError("check cache key", err))
-				return
+				e := common.TransportError("check cache key", err)
+				fmt.Println(e)
+				return e
 			}
 			defer resp.Body.Close()
 
 			b, err := common.CheckResponse(resp, "check cache key")
 			if err != nil {
 				fmt.Println(err)
-				return
+				return err
 			}
 			var result struct {
 				Exists bool `json:"exists"`
 			}
 			if err := json.Unmarshal(b, &result); err != nil {
-				fmt.Printf("Couldn't check cache key: the API response didn't look right (%s)\n", string(b))
-				return
+				e := fmt.Errorf("Couldn't check cache key: the API response didn't look right (%s)", string(b))
+				fmt.Println(e)
+				return e
 			}
 
 			if result.Exists {
@@ -161,6 +170,7 @@ func cacheExistsCmd() *cobra.Command {
 			} else {
 				fmt.Printf("%q does not exist\n", key)
 			}
+			return nil
 		},
 	}
 }

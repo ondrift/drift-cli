@@ -16,8 +16,10 @@ import (
 
 func main() {
 	rootCmd := &cobra.Command{
-		Use:   "drift",
-		Short: "Drift is a minimalist cloud hosting service.",
+		Use:           "drift",
+		Short:         "Drift is a minimalist cloud hosting service.",
+		SilenceErrors: true,
+		SilenceUsage:  true,
 	}
 
 	rootCmd.AddGroup(&cobra.Group{

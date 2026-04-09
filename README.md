@@ -24,11 +24,14 @@ drift account upgrade <tier>      Upgrade account tier
 ### Slice lifecycle
 
 ```
-drift slice create <name> [--tier hacker]   Create a new slice (auto-sets as active)
+drift slice create                          Open the configurator in a browser; type the name in the form
+drift slice create <name>                   Same, but pre-fills the form with the given name
+drift slice create <name> --headless [-t hacker]
+                                            Create a slice with a named tier (no browser, for CI/scripts)
+drift slice resize <name>                   Open the configurator to resize an existing slice
 drift slice list                            List slices (* marks active)
 drift slice use <name>                      Set active slice
 drift slice delete <name>                   Delete a slice (with confirmation)
-drift slice upgrade <tier>                  Upgrade active slice tier
 ```
 
 ### Deploy
