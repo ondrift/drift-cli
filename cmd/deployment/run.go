@@ -228,7 +228,7 @@ func getRunCmd() *cobra.Command {
 			}
 
 			elapsed := time.Since(start).Seconds()
-			fmt.Printf("  %s\n\n", common.Hint(fmt.Sprintf("Done in %.1fs 🚀", elapsed)))
+			fmt.Printf("  %s\n\n", common.Hint(fmt.Sprintf("Done in %.1fs!", elapsed)))
 			return nil
 		},
 	}
