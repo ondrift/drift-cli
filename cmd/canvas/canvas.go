@@ -10,6 +10,7 @@ func GetCmd() *cobra.Command {
 	slateCmd := &cobra.Command{
 		Use:     "canvas",
 		Short:   "Manage Canvas hosting",
+		Example: "  drift canvas deploy ./my-site\n  drift canvas deploy ./my-site --site landing-page",
 		GroupID: "services",
 	}
 

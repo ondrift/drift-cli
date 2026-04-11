@@ -36,6 +36,7 @@ func getCreateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create [name]",
 		Short: "Create a new slice (project)",
+		Example: "  drift slice create\n  drift slice create my-slice\n  drift slice create my-slice --headless\n  drift slice create my-slice --headless --tier prototyper",
 		Args:  cobra.MaximumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			var name string

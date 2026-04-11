@@ -14,6 +14,7 @@ func Metrics() *cobra.Command {
 	return &cobra.Command{
 		Use:     "metrics <function-name>",
 		Short:   "Show request metrics for a deployed function",
+		Example: "  drift atomic metrics send-email",
 		GroupID: "operations",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

@@ -14,6 +14,7 @@ func Delete() *cobra.Command {
 	return &cobra.Command{
 		Use:     "delete <name>",
 		Short:   "Delete a deployed atomic function by name",
+		Example: "  drift atomic delete send-email",
 		GroupID: "operations",
 		Args:    cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {

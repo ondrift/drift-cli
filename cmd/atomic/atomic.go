@@ -13,6 +13,7 @@ func GetCmd() *cobra.Command {
 	atomicCmd := &cobra.Command{
 		Use:     "atomic",
 		Short:   "Manage Atomic deployments",
+		Example: "  drift atomic list\n  drift atomic deploy ./my-function\n  drift atomic run ./my-function\n  drift atomic new",
 		GroupID: "services",
 	}
 

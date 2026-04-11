@@ -10,6 +10,8 @@ func GetAccountCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "account",
 		Short:   "Manage your Drift account",
+		Example: `  drift account create
+  drift account login`,
 		GroupID: "account",
 	}
 	cmd.AddCommand(

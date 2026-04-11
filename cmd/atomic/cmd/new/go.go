@@ -23,6 +23,7 @@ func Go() *cobra.Command {
 	atomicNewCmd := &cobra.Command{
 		Use:                "new",
 		Short:              "Create a new Atomic function",
+		Example:            "  drift atomic new",
 		GroupID:            "development",
 		DisableFlagParsing: true,
 		Args:               cobra.NoArgs,

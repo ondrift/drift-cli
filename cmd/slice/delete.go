@@ -1,6 +1,7 @@
 package slice
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -14,11 +15,19 @@ import (
 func getDeleteCmd() *cobra.Command {
 	var yes bool
 	deleteCmd := &cobra.Command{
-		Use:   "delete <name>",
-		Short: "Delete a slice and everything in it (irreversible)",
-		Args:  cobra.ExactArgs(1),
+		Use:     "delete <name>",
+		Short:   "Delete a slice and everything in it (irreversible)",
+		Args:    cobra.ExactArgs(1),
+		Example: "  drift slice delete my-slice\n  drift slice delete my-slice --yes",
 		Run: func(cmd *cobra.Command, args []string) {
 			name := args[0]
+
+			// Pre-check: verify the slice actually exists before showing
+			// the scary confirmation prompts.
+			if !sliceExists(name) {
+				fmt.Printf("Couldn't delete slice: no slice named %q was found.\n", name)
+				return
+			}
 
 			// --yes skips both interactive confirmations. The slice name
 			// still has to match the argv, which preserves the "you must
@@ -72,6 +81,39 @@ func getDeleteCmd() *cobra.Command {
 
 	deleteCmd.Flags().BoolVar(&yes, "yes", false, "Skip confirmation prompts (for scripts). The slice name argument must still match exactly.")
 	return deleteCmd
+}
+
+// sliceExists checks whether a slice with the given name exists by calling
+// the list endpoint and looking for a match.
+func sliceExists(name string) bool {
+	resp, err := common.DoRequest(
+		http.MethodGet,
+		common.APIBaseURL+"/ops/slice/list",
+		nil,
+	)
+	if err != nil {
+		// If we can't reach the API, let the delete proceed — the server
+		// will reject it with a proper error message.
+		return true
+	}
+	defer resp.Body.Close()
+
+	body, err := common.CheckResponse(resp, "check slice exists")
+	if err != nil {
+		return true
+	}
+
+	var slices []sliceEntry
+	if err := json.Unmarshal(body, &slices); err != nil {
+		return true
+	}
+
+	for _, s := range slices {
+		if s.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 // printDeleteWarning spells out exactly what will be destroyed so the user

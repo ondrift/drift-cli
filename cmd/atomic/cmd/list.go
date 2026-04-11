@@ -75,6 +75,7 @@ func List() *cobra.Command {
 	return &cobra.Command{
 		Use:     "list",
 		Short:   "List all deployed atomic functions",
+		Example: "  drift atomic list",
 		GroupID: "operations",
 		Args:    cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {

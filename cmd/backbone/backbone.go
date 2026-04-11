@@ -8,6 +8,7 @@ func GetCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "backbone",
 		Short:   "Interact with your slice's backbone primitives",
+		Example: "  drift backbone secret list\n  drift backbone queue push jobs '{\"task\":\"build\"}'\n  drift backbone blob put assets logo.png ./logo.png\n  drift backbone cache set session-token abc123 --ttl 3600",
 		GroupID: "services",
 	}
 

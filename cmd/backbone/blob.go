@@ -14,8 +14,9 @@ import (
 
 func blobCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "blob",
-		Short: "Store and retrieve binary blobs in your slice",
+		Use:     "blob",
+		Short:   "Store and retrieve binary blobs in your slice",
+		Example: "  drift backbone blob put assets logo.png ./logo.png\n  drift backbone blob get assets logo.png > logo.png\n  drift backbone blob list assets\n  drift backbone blob delete assets logo.png",
 	}
 	cmd.AddCommand(blobPutCmd(), blobGetCmd(), blobListCmd(), blobDeleteCmd())
 	return cmd
@@ -23,9 +24,10 @@ func blobCmd() *cobra.Command {
 
 func blobPutCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "put <bucket> <key> <file>",
-		Short: "Upload a file to a blob bucket",
-		Args:  cobra.ExactArgs(3),
+		Use:     "put <bucket> <key> <file>",
+		Short:   "Upload a file to a blob bucket",
+		Example: "  drift backbone blob put assets logo.png ./logo.png\n  drift backbone blob put uploads report.pdf ./report.pdf",
+		Args:    cobra.ExactArgs(3),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			bucket, key, file := args[0], args[1], args[2]
 
@@ -59,9 +61,10 @@ func blobPutCmd() *cobra.Command {
 
 func blobGetCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "get <bucket> <key>",
-		Short: "Download a blob and write it to stdout",
-		Args:  cobra.ExactArgs(2),
+		Use:     "get <bucket> <key>",
+		Short:   "Download a blob and write it to stdout",
+		Example: "  drift backbone blob get assets logo.png > logo.png\n  drift backbone blob get uploads report.pdf > report.pdf",
+		Args:    cobra.ExactArgs(2),
 		Run: func(cmd *cobra.Command, args []string) {
 			bucket, key := args[0], args[1]
 
@@ -90,9 +93,10 @@ func blobGetCmd() *cobra.Command {
 
 func blobListCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "list <bucket>",
-		Short: "List keys in a blob bucket",
-		Args:  cobra.ExactArgs(1),
+		Use:     "list <bucket>",
+		Short:   "List keys in a blob bucket",
+		Example: "  drift backbone blob list assets",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			bucket := args[0]
 
@@ -126,9 +130,10 @@ func blobListCmd() *cobra.Command {
 
 func blobDeleteCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "delete <bucket> <key>",
-		Short: "Delete a blob",
-		Args:  cobra.ExactArgs(2),
+		Use:     "delete <bucket> <key>",
+		Short:   "Delete a blob",
+		Example: "  drift backbone blob delete assets logo.png",
+		Args:    cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			bucket, key := args[0], args[1]
 

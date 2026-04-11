@@ -12,6 +12,7 @@ func getUseCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "use <name>",
 		Short: "Set the active slice for subsequent commands",
+		Example: "  drift slice use my-slice",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			name := args[0]

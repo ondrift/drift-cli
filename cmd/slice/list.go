@@ -19,6 +19,7 @@ func getListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List all your slices",
+		Example: "  drift slice list",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			resp, err := common.DoRequest(

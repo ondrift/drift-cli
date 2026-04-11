@@ -15,12 +15,14 @@ func Trigger() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "trigger",
 		Short:   "Manage event triggers for atomic functions",
+		Example: "  drift atomic trigger list\n  drift atomic trigger register queue order-processor --queue orders --target http://localhost:8080\n  drift atomic trigger register schedule nightly-sync --cron \"0 0 * * *\" --target http://localhost:8080\n  drift atomic trigger unregister order-processor",
 		GroupID: "operations",
 	}
 
 	register := &cobra.Command{
-		Use:   "register",
-		Short: "Register a trigger",
+		Use:     "register",
+		Short:   "Register a trigger",
+		Example: "  drift atomic trigger register queue order-processor --queue orders --target http://localhost:8080\n  drift atomic trigger register schedule nightly-sync --cron \"0 0 * * *\" --target http://localhost:8080",
 	}
 	register.AddCommand(triggerRegisterQueueCmd(), triggerRegisterScheduleCmd())
 
@@ -30,9 +32,10 @@ func Trigger() *cobra.Command {
 
 func triggerListCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "list",
-		Short: "List all registered triggers",
-		Args:  cobra.NoArgs,
+		Use:     "list",
+		Short:   "List all registered triggers",
+		Example: "  drift atomic trigger list",
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			resp, err := common.DoRequest(
 				http.MethodGet,
@@ -83,9 +86,10 @@ func triggerRegisterQueueCmd() *cobra.Command {
 	var queue, target string
 	var pollMS, maxRetry int
 	cmd := &cobra.Command{
-		Use:   "queue <name>",
-		Short: "Register a queue trigger — polls a Backbone queue and invokes a function on each message",
-		Args:  cobra.ExactArgs(1),
+		Use:     "queue <name>",
+		Short:   "Register a queue trigger — polls a Backbone queue and invokes a function on each message",
+		Example: "  drift atomic trigger register queue order-processor --queue orders --target http://localhost:8080\n  drift atomic trigger register queue email-sender --queue emails --target http://localhost:8080 --poll-ms 250 --max-retry 5",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
 
@@ -130,9 +134,10 @@ func triggerRegisterQueueCmd() *cobra.Command {
 func triggerRegisterScheduleCmd() *cobra.Command {
 	var cron, target string
 	cmd := &cobra.Command{
-		Use:   "schedule <name>",
-		Short: "Register a cron schedule trigger (5-field: minute hour dom month dow)",
-		Args:  cobra.ExactArgs(1),
+		Use:     "schedule <name>",
+		Short:   "Register a cron schedule trigger (5-field: minute hour dom month dow)",
+		Example: "  drift atomic trigger register schedule nightly-sync --cron \"0 0 * * *\" --target http://localhost:8080\n  drift atomic trigger register schedule health-check --cron \"*/5 * * * *\" --target http://localhost:8080",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
 
@@ -172,9 +177,10 @@ func triggerRegisterScheduleCmd() *cobra.Command {
 
 func triggerUnregisterCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "unregister <name>",
-		Short: "Unregister a trigger by name",
-		Args:  cobra.ExactArgs(1),
+		Use:     "unregister <name>",
+		Short:   "Unregister a trigger by name",
+		Example: "  drift atomic trigger unregister order-processor",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
 

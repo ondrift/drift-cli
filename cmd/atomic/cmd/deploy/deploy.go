@@ -428,6 +428,7 @@ func Deploy() *cobra.Command {
 	atomicDeployCmd := &cobra.Command{
 		Use:     "deploy [function folder]",
 		Short:   "Deploy a function endpoint",
+		Example: "  drift atomic deploy ./send-email\n  drift atomic deploy ./create-invoice --element billing",
 		GroupID: "operations",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

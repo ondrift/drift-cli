@@ -130,7 +130,9 @@ func GetCreateCmd() *cobra.Command {
 			fmt.Println("Check your usage anytime                          :: 'drift account usage'")
 			fmt.Println("Happy building!")
 		},
-		Example: "drift signup",
+		Example: `  drift account create
+  drift account create --username alice --email alice@example.com
+  drift account create -u alice -e alice@example.com -p s3cret`,
 	}
 
 	createCmd.Flags().StringVarP(&username, "username", "u", "", "Username (skips interactive prompt)")

@@ -17,6 +17,7 @@ func Logs() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "logs <function-name>",
 		Short:   "Fetch recent logs for a deployed function",
+		Example: "  drift atomic logs send-email\n  drift atomic logs send-email --tail 50",
 		GroupID: "operations",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

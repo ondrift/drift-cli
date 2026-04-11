@@ -7,6 +7,7 @@ func GetCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "deployment",
 		Short:   "Manage a drift deployment",
+		Example: "  drift deployment run",
 		GroupID: "deployment",
 	}
 	cmd.AddCommand(

@@ -211,6 +211,8 @@ resources this project will consume, whether they fit within your current
 plan limits, and what headroom remains after the deploy.
 
 To see your current plan and usage, run: drift slice plan`,
+		Example: `  drift plan drift.yaml
+  drift plan ./my-app/drift.yaml`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			usage, err := FetchUsage()

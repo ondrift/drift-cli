@@ -12,6 +12,7 @@ func Element() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "element",
 		Short:   "Manage Atomic elements (virtual API groups)",
+		Example: "  drift atomic element list",
 		GroupID: "operations",
 	}
 	cmd.AddCommand(elementList())
@@ -20,9 +21,10 @@ func Element() *cobra.Command {
 
 func elementList() *cobra.Command {
 	return &cobra.Command{
-		Use:   "list",
-		Short: "List all elements and the functions they contain",
-		Args:  cobra.NoArgs,
+		Use:     "list",
+		Short:   "List all elements and the functions they contain",
+		Example: "  drift atomic element list",
+		Args:    cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			deployed, err := fetchDeployedFunctions()
 			if err != nil {

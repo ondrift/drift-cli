@@ -15,6 +15,7 @@ func Deploy() *cobra.Command {
 	deployCmd := &cobra.Command{
 		Use:   "deploy [directory]",
 		Short: "Deploy a static site from a directory",
+		Example: "  drift canvas deploy ./my-site\n  drift canvas deploy ./dist --site landing-page",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			folder := args[0]

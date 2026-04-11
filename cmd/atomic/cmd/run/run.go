@@ -40,9 +40,10 @@ var defaultGolangServerGet string
 
 func Run() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "run [function folder]",
-		Short: "Run an Atomic function locally with hot reload",
-		Args:  cobra.ExactArgs(1),
+		Use:     "run [function folder]",
+		Short:   "Run an Atomic function locally with hot reload",
+		Example: "  drift atomic run ./send-email\n  drift atomic run ./create-invoice",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			srcDir := args[0]
 			absSrc, err := filepath.Abs(srcDir)

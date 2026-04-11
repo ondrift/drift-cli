@@ -13,8 +13,9 @@ import (
 
 func cacheCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "cache",
-		Short: "In-memory key-value cache in your slice",
+		Use:     "cache",
+		Short:   "In-memory key-value cache in your slice",
+		Example: "  drift backbone cache set session-token abc123 --ttl 3600\n  drift backbone cache get session-token\n  drift backbone cache exists session-token\n  drift backbone cache del session-token",
 	}
 	cmd.AddCommand(cacheSetCmd(), cacheGetCmd(), cacheDelCmd(), cacheExistsCmd())
 	return cmd
@@ -23,9 +24,10 @@ func cacheCmd() *cobra.Command {
 func cacheSetCmd() *cobra.Command {
 	var ttl int
 	cmd := &cobra.Command{
-		Use:   "set <key> <value>",
-		Short: "Set a cache key",
-		Args:  cobra.ExactArgs(2),
+		Use:     "set <key> <value>",
+		Short:   "Set a cache key",
+		Example: "  drift backbone cache set session-token abc123\n  drift backbone cache set rate-limit 100 --ttl 60",
+		Args:    cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			key, value := args[0], args[1]
 
@@ -61,9 +63,10 @@ func cacheSetCmd() *cobra.Command {
 
 func cacheGetCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "get <key>",
-		Short: "Get a cache value",
-		Args:  cobra.ExactArgs(1),
+		Use:     "get <key>",
+		Short:   "Get a cache value",
+		Example: "  drift backbone cache get session-token",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			key := args[0]
 
@@ -97,9 +100,10 @@ func cacheGetCmd() *cobra.Command {
 
 func cacheDelCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "del <key>",
-		Short: "Delete a cache key",
-		Args:  cobra.ExactArgs(1),
+		Use:     "del <key>",
+		Short:   "Delete a cache key",
+		Example: "  drift backbone cache del session-token",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			key := args[0]
 
@@ -133,9 +137,10 @@ func cacheDelCmd() *cobra.Command {
 
 func cacheExistsCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "exists <key>",
-		Short: "Check whether a cache key exists",
-		Args:  cobra.ExactArgs(1),
+		Use:     "exists <key>",
+		Short:   "Check whether a cache key exists",
+		Example: "  drift backbone cache exists session-token",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			key := args[0]
 

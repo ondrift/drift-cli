@@ -26,6 +26,7 @@ func getResizeCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "resize <name>",
 		Short: "Resize an existing slice (open the configurator in your browser)",
+		Example: "  drift slice resize my-slice",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			name := args[0]

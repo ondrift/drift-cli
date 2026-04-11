@@ -13,8 +13,9 @@ import (
 
 func queueCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "queue",
-		Short: "Push and pop messages from named queues in your slice",
+		Use:     "queue",
+		Short:   "Push and pop messages from named queues in your slice",
+		Example: "  drift backbone queue push jobs '{\"task\":\"build\",\"ref\":\"main\"}'\n  drift backbone queue pop jobs\n  drift backbone queue peek jobs\n  drift backbone queue len jobs\n  drift backbone queue drop jobs",
 	}
 	cmd.AddCommand(queuePushCmd(), queuePopCmd(), queuePeekCmd(), queueLenCmd(), queueDropCmd())
 	return cmd
@@ -22,9 +23,10 @@ func queueCmd() *cobra.Command {
 
 func queuePushCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "push <name> <json>",
-		Short: "Push a JSON message onto a queue",
-		Args:  cobra.ExactArgs(2),
+		Use:     "push <name> <json>",
+		Short:   "Push a JSON message onto a queue",
+		Example: "  drift backbone queue push jobs '{\"task\":\"build\",\"ref\":\"main\"}'\n  drift backbone queue push emails '{\"to\":\"alice@example.com\",\"subject\":\"Hello\"}'",
+		Args:    cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name, rawJSON := args[0], args[1]
 
@@ -67,9 +69,10 @@ func queuePushCmd() *cobra.Command {
 
 func queuePopCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "pop <name>",
-		Short: "Pop the next message from a queue",
-		Args:  cobra.ExactArgs(1),
+		Use:     "pop <name>",
+		Short:   "Pop the next message from a queue",
+		Example: "  drift backbone queue pop jobs",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
 
@@ -100,9 +103,10 @@ func queuePopCmd() *cobra.Command {
 
 func queuePeekCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "peek <name>",
-		Short: "Peek at the next message without removing it",
-		Args:  cobra.ExactArgs(1),
+		Use:     "peek <name>",
+		Short:   "Peek at the next message without removing it",
+		Example: "  drift backbone queue peek jobs",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
 
@@ -133,9 +137,10 @@ func queuePeekCmd() *cobra.Command {
 
 func queueDropCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "drop <name>",
-		Short: "Delete a queue and all its messages",
-		Args:  cobra.ExactArgs(1),
+		Use:     "drop <name>",
+		Short:   "Delete a queue and all its messages",
+		Example: "  drift backbone queue drop jobs",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
 
@@ -160,9 +165,10 @@ func queueDropCmd() *cobra.Command {
 
 func queueLenCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "len <name>",
-		Short: "Print the number of messages in a queue",
-		Args:  cobra.ExactArgs(1),
+		Use:     "len <name>",
+		Short:   "Print the number of messages in a queue",
+		Example: "  drift backbone queue len jobs",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
 

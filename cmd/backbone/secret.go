@@ -14,8 +14,9 @@ import (
 
 func secretCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "secret",
-		Short: "Manage encrypted secrets in your slice",
+		Use:     "secret",
+		Short:   "Manage encrypted secrets in your slice",
+		Example: "  drift backbone secret set API_KEY=sk-abc123\n  drift backbone secret get API_KEY\n  drift backbone secret list\n  drift backbone secret delete API_KEY",
 	}
 	cmd.AddCommand(secretSetCmd(), secretGetCmd(), secretListCmd(), secretDeleteCmd())
 	return cmd
@@ -23,9 +24,10 @@ func secretCmd() *cobra.Command {
 
 func secretSetCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "set KEY=VALUE",
-		Short: "Store an encrypted secret",
-		Args:  cobra.ExactArgs(1),
+		Use:     "set KEY=VALUE",
+		Short:   "Store an encrypted secret",
+		Example: "  drift backbone secret set API_KEY=sk-abc123\n  drift backbone secret set DB_PASSWORD=hunter2",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			parts := strings.SplitN(args[0], "=", 2)
 			if len(parts) != 2 || parts[0] == "" {
@@ -61,9 +63,10 @@ func secretSetCmd() *cobra.Command {
 
 func secretGetCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "get KEY",
-		Short: "Retrieve the value of a secret",
-		Args:  cobra.ExactArgs(1),
+		Use:     "get KEY",
+		Short:   "Retrieve the value of a secret",
+		Example: "  drift backbone secret get API_KEY",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			resp, err := common.DoRequest(
 				http.MethodGet,
@@ -91,9 +94,10 @@ func secretGetCmd() *cobra.Command {
 
 func secretListCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "list",
-		Short: "List secret names",
-		Args:  cobra.NoArgs,
+		Use:     "list",
+		Short:   "List secret names",
+		Example: "  drift backbone secret list",
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			resp, err := common.DoRequest(
 				http.MethodGet,
@@ -128,9 +132,10 @@ func secretListCmd() *cobra.Command {
 
 func secretDeleteCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "delete KEY",
-		Short: "Delete a secret",
-		Args:  cobra.ExactArgs(1),
+		Use:     "delete KEY",
+		Short:   "Delete a secret",
+		Example: "  drift backbone secret delete API_KEY",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			body, _ := json.Marshal(map[string]string{"name": args[0]})
 			resp, err := common.DoJSONRequest(

@@ -59,6 +59,9 @@ func GetLoginCmd() *cobra.Command {
 	loginCmd := &cobra.Command{
 		Use:   "login",
 		Short: "Login to Drift and get a JWT token",
+		Example: `  drift account login
+  drift account login --username alice
+  drift account login -u alice -p s3cret`,
 		Run: func(cmd *cobra.Command, args []string) {
 			if username == "" {
 				username = common.PromptForInput("Username")

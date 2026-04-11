@@ -13,8 +13,9 @@ import (
 
 func nosqlCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "nosql",
-		Short: "Read and write JSON documents to the Backbone NoSQL store",
+		Use:     "nosql",
+		Short:   "Read and write JSON documents to the Backbone NoSQL store",
+		Example: "  drift backbone nosql write --data '{\"key\":\"user-1\",\"name\":\"Alice\"}'\n  drift backbone nosql read --key user-1\n  drift backbone nosql list --collection users --field status --value active\n  drift backbone nosql drop old-logs",
 	}
 	cmd.AddCommand(nosqlWriteCmd(), nosqlReadCmd(), nosqlListCmd(), nosqlDropCmd())
 	return cmd
@@ -23,9 +24,10 @@ func nosqlCmd() *cobra.Command {
 func nosqlWriteCmd() *cobra.Command {
 	var collection, data string
 	cmd := &cobra.Command{
-		Use:   "write",
-		Short: "Write a JSON document to a collection",
-		Args:  cobra.NoArgs,
+		Use:     "write",
+		Short:   "Write a JSON document to a collection",
+		Example: "  drift backbone nosql write --data '{\"key\":\"user-1\",\"name\":\"Alice\"}'\n  drift backbone nosql write --collection users --data '{\"key\":\"user-2\",\"name\":\"Bob\"}'",
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if data == "" {
 				e := fmt.Errorf("Couldn't write document: --data is required.")
@@ -77,9 +79,10 @@ func nosqlWriteCmd() *cobra.Command {
 
 func nosqlDropCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "drop <collection>",
-		Short: "Delete a NoSQL collection and all its documents",
-		Args:  cobra.ExactArgs(1),
+		Use:     "drop <collection>",
+		Short:   "Delete a NoSQL collection and all its documents",
+		Example: "  drift backbone nosql drop old-logs\n  drift backbone nosql drop temp-data",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
 
@@ -106,9 +109,10 @@ func nosqlListCmd() *cobra.Command {
 	var collection, field, value string
 	var limit int
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List all documents in a collection, with optional field filtering",
-		Args:  cobra.NoArgs,
+		Use:     "list",
+		Short:   "List all documents in a collection, with optional field filtering",
+		Example: "  drift backbone nosql list\n  drift backbone nosql list --collection users\n  drift backbone nosql list --collection users --field status --value active\n  drift backbone nosql list --collection orders --limit 10",
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			url := fmt.Sprintf("%s/ops/backbone/nosql/list?collection=%s&limit=%d", common.APIBaseURL, collection, limit)
 			if field != "" && value != "" {
@@ -160,9 +164,10 @@ func nosqlListCmd() *cobra.Command {
 func nosqlReadCmd() *cobra.Command {
 	var collection, key string
 	cmd := &cobra.Command{
-		Use:   "read",
-		Short: "Read a document by key from a collection",
-		Args:  cobra.NoArgs,
+		Use:     "read",
+		Short:   "Read a document by key from a collection",
+		Example: "  drift backbone nosql read --key user-1\n  drift backbone nosql read --collection users --key user-1",
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if key == "" {
 				e := fmt.Errorf("Couldn't read document: --key is required.")

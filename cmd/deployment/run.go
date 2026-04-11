@@ -74,6 +74,7 @@ func getRunCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "run",
 		Short: "Deploy all resources declared in a drift.yaml manifest",
+		Example: "  drift deployment run",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if _, err := common.RequireActiveSlice(); err != nil {

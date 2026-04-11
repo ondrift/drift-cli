@@ -16,6 +16,7 @@ func Auth() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "auth",
 		Short:   "Manage API key authentication for deployed functions",
+		Example: "  drift atomic auth set send-email my-secret-key\n  drift atomic auth list send-email\n  drift atomic auth revoke send-email --method get",
 		GroupID: "operations",
 	}
 	cmd.AddCommand(authSet(), authList(), authRevoke())
@@ -27,9 +28,10 @@ func authSet() *cobra.Command {
 	var method string
 
 	cmd := &cobra.Command{
-		Use:   "set <function-name> <api-key>",
-		Short: "Set or rotate the API key for a deployed function",
-		Args:  cobra.ExactArgs(2),
+		Use:     "set <function-name> <api-key>",
+		Short:   "Set or rotate the API key for a deployed function",
+		Example: "  drift atomic auth set send-email my-secret-key\n  drift atomic auth set send-email my-secret-key --method get",
+		Args:    cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			function := args[0]
 			key := args[1]
@@ -66,9 +68,10 @@ func authSet() *cobra.Command {
 // authList shows key fingerprints configured for a function.
 func authList() *cobra.Command {
 	return &cobra.Command{
-		Use:   "list <function-name>",
-		Short: "List API keys configured for a deployed function",
-		Args:  cobra.ExactArgs(1),
+		Use:     "list <function-name>",
+		Short:   "List API keys configured for a deployed function",
+		Example: "  drift atomic auth list send-email",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			function := args[0]
 
@@ -112,9 +115,10 @@ func authRevoke() *cobra.Command {
 	var method string
 
 	cmd := &cobra.Command{
-		Use:   "revoke <function-name>",
-		Short: "Revoke the API key for a deployed function",
-		Args:  cobra.ExactArgs(1),
+		Use:     "revoke <function-name>",
+		Short:   "Revoke the API key for a deployed function",
+		Example: "  drift atomic auth revoke send-email\n  drift atomic auth revoke send-email --method delete",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			function := args[0]
 
