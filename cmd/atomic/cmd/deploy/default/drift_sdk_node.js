@@ -74,7 +74,8 @@ function _runLocal(handler) {
     try {
       const resp = await handler(funcReq);
       const out = JSON.stringify(resp);
-      res.writeHead(resp.status || 200, { "Content-Type": "application/json" });
+      const hdrs = { "Content-Type": "application/json", ...resp.headers };
+      res.writeHead(resp.status || 200, hdrs);
       res.end(out);
     } catch (err) {
       res.writeHead(500, { "Content-Type": "application/json" });

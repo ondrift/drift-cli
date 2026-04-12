@@ -86,6 +86,8 @@ def _run_local(handler):
 
             self.send_response(status)
             self.send_header("Content-Type", "application/json")
+            for hk, hv in resp.get("headers", {}).items():
+                self.send_header(hk, hv)
             self.end_headers()
             self.wfile.write(out)
 

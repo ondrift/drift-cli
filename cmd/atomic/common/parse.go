@@ -36,7 +36,7 @@ func ParseAtomicMetadata(filename string) (method, name, auth string, err error)
 		return "", "", "", err
 	}
 
-	re := regexp.MustCompile(`@atomic route=([a-zA-Z]+):([a-zA-Z0-9_-]+) auth=([a-zA-Z0-9_-]+)`)
+	re := regexp.MustCompile(`@atomic route=([a-zA-Z]+):([a-zA-Z0-9_/:-]+) auth=([a-zA-Z0-9_-]+)`)
 	matches := re.FindSubmatch(data)
 	if len(matches) != 4 {
 		return "", "", "", fmt.Errorf("atomic metadata not found or invalid format")

@@ -45,8 +45,14 @@ func DetectLanguage(dir string) (string, string, error) {
 }
 
 // FuncNameForLanguage returns the expected handler function name given the
-// @atomic method+name and the target language.
+// @atomic method+name and the target language. Route patterns with path
+// parameters (e.g., "users/:id") are normalized first: colons are stripped
+// and slashes become hyphens, so "users/:id" → "users-id" before casing.
 func FuncNameForLanguage(method, name, language string) string {
+	// Normalize parameterized route patterns into plain kebab-case.
+	name = strings.ReplaceAll(name, ":", "")
+	name = strings.ReplaceAll(name, "/", "-")
+
 	switch language {
 	case "python", "ruby", "php", "rust":
 		return toSnakeCase(method) + "_" + toSnakeCase(name)
