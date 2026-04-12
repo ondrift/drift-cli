@@ -25,7 +25,7 @@ import (
 )
 
 // ==========================================================
-// Embedded server templates (reuse your existing ones)
+// Embedded templates: Go server + Python/Node wrappers + SDKs
 // ==========================================================
 
 //go:embed default/server_post.txt
@@ -33,6 +33,54 @@ var defaultGolangServerPost string
 
 //go:embed default/server_get.txt
 var defaultGolangServerGet string
+
+//go:embed default/wrapper_post_python.txt
+var wrapperPostPython string
+
+//go:embed default/wrapper_get_python.txt
+var wrapperGetPython string
+
+//go:embed default/wrapper_post_node.txt
+var wrapperPostNode string
+
+//go:embed default/wrapper_get_node.txt
+var wrapperGetNode string
+
+//go:embed default/drift_sdk.py
+var embeddedPythonSDK string
+
+//go:embed default/drift_sdk_node.js
+var embeddedNodeSDK string
+
+//go:embed default/wrapper_post_ruby.txt
+var wrapperPostRuby string
+
+//go:embed default/wrapper_get_ruby.txt
+var wrapperGetRuby string
+
+//go:embed default/wrapper_post_php.txt
+var wrapperPostPHP string
+
+//go:embed default/wrapper_get_php.txt
+var wrapperGetPHP string
+
+//go:embed default/wrapper_post_rust.txt
+var wrapperPostRust string
+
+//go:embed default/wrapper_get_rust.txt
+var wrapperGetRust string
+
+//go:embed default/drift_sdk_ruby.rb
+var embeddedRubySDK string
+
+//go:embed default/drift_sdk_php.php
+var embeddedPHPSDK string
+
+//go:embed default/drift_sdk_rust.rs
+var embeddedRustSDK string
+
+//go:embed default/cargo_template.toml
+var cargoTemplate string
 
 // ==========================================================
 // Public command factory
@@ -57,13 +105,19 @@ func Run() *cobra.Command {
 				return fmt.Errorf("parse Atomic metadata: %w", err)
 			}
 
-			// Try to detect port from annotation `port=XXXX` (optional). Falls back to 8080.
+			// Detect language from the annotated source file.
+			language, sourceFile, err := atomic_common.DetectLanguage(absSrc)
+			if err != nil {
+				return fmt.Errorf("detect language: %w", err)
+			}
+
+			// Try to detect port from annotation `port=XXXX` (optional). Falls back to 3000.
 			port := detectPortFromAnnotation(absSrc)
 			if port == 0 {
 				port = 3000
 			}
 
-			fmt.Printf("▶️  Running function '%s /%s' on http://localhost:%d\n", strings.ToUpper(method), name, port)
+			fmt.Printf("▶️  Running %s function '%s /%s' on http://localhost:%d\n", language, strings.ToUpper(method), name, port)
 
 			// Create a persistent temp workspace for this run session
 			workDir, err := os.MkdirTemp("", "drift_atomic_run_*")
@@ -75,12 +129,14 @@ func Run() *cobra.Command {
 
 			// Initial sync & start
 			runner := &devRunner{
-				srcDir:   absSrc,
-				workDir:  workDir,
-				method:   strings.ToLower(method),
-				name:     name,
-				port:     port,
-				procLock: &sync.Mutex{},
+				srcDir:     absSrc,
+				workDir:    workDir,
+				method:     strings.ToLower(method),
+				name:       name,
+				port:       port,
+				language:   language,
+				sourceFile: sourceFile,
+				procLock:   &sync.Mutex{},
 			}
 
 			if err := runner.syncWorkspace(); err != nil {
@@ -88,6 +144,9 @@ func Run() *cobra.Command {
 			}
 			if err := runner.generateMain(); err != nil {
 				return err
+			}
+			if err := runner.installDeps(); err != nil {
+				log.Printf("dependency install warning: %v", err)
 			}
 			if err := runner.buildAndRun(); err != nil {
 				log.Printf("initial build failed, staying in watch mode: %v", err)
@@ -102,22 +161,42 @@ func Run() *cobra.Command {
 }
 
 // ==========================================================
-// devRunner orchestrates sync → (generate main) → build → run → reload
+// devRunner orchestrates sync → generate → (install deps) → build → run → reload
 // ==========================================================
 
 type devRunner struct {
-	srcDir  string
-	workDir string
-
-	method string // get/post/...
-	name   string // route/resource name
-	port   int
+	srcDir     string
+	workDir    string
+	method     string // get/post/...
+	name       string // route/resource name
+	port       int
+	language   string // "native", "python", "node", "ruby", "php", "rust"
+	sourceFile string // filename with extension (e.g., "checkout.py")
 
 	proc     *exec.Cmd
 	procLock *sync.Mutex
 }
 
+// ---------- generateMain ----------
+
 func (r *devRunner) generateMain() error {
+	switch r.language {
+	case "python":
+		return r.generatePython()
+	case "node":
+		return r.generateNode()
+	case "ruby":
+		return r.generateRuby()
+	case "php":
+		return r.generatePHP()
+	case "rust":
+		return r.generateRust()
+	default:
+		return r.generateGo()
+	}
+}
+
+func (r *devRunner) generateGo() error {
 	funcName := common.CapitalizeFirst(strings.ToLower(r.method)) + common.CapitalizeFirst(strings.ToLower(r.name))
 
 	var code string
@@ -126,19 +205,230 @@ func (r *devRunner) generateMain() error {
 		"{{ROUTE}}", "/"+r.name,
 		"{{PORT}}", fmt.Sprintf("%d", r.port),
 	)
-	switch strings.ToLower(r.method) {
-	case "post":
+	switch r.method {
+	case "post", "put", "delete", "patch":
 		code = replacer.Replace(defaultGolangServerPost)
-	case "get":
-		code = replacer.Replace(defaultGolangServerGet)
 	default:
-		return fmt.Errorf("unsupported method: %s", r.method)
+		code = replacer.Replace(defaultGolangServerGet)
 	}
 
 	return os.WriteFile(filepath.Join(r.workDir, "main.go"), []byte(code), 0o600)
 }
 
+func (r *devRunner) generatePython() error {
+	funcName := atomic_common.FuncNameForLanguage(r.method, r.name, "python")
+	sourceModule := strings.TrimSuffix(r.sourceFile, ".py")
+
+	var tmpl string
+	switch r.method {
+	case "post", "put", "delete", "patch":
+		tmpl = wrapperPostPython
+	default:
+		tmpl = wrapperGetPython
+	}
+
+	code := strings.NewReplacer(
+		"{{SOURCE}}", sourceModule,
+		"{{FUNC}}", funcName,
+	).Replace(tmpl)
+
+	if err := os.WriteFile(filepath.Join(r.workDir, "app.py"), []byte(code), 0o644); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(r.workDir, "drift.py"), []byte(embeddedPythonSDK), 0o644)
+}
+
+func (r *devRunner) generateNode() error {
+	funcName := atomic_common.FuncNameForLanguage(r.method, r.name, "node")
+	sourceModule := strings.TrimSuffix(r.sourceFile, ".js")
+
+	var tmpl string
+	switch r.method {
+	case "post", "put", "delete", "patch":
+		tmpl = wrapperPostNode
+	default:
+		tmpl = wrapperGetNode
+	}
+
+	code := strings.NewReplacer(
+		"{{SOURCE}}", sourceModule,
+		"{{FUNC}}", funcName,
+	).Replace(tmpl)
+
+	if err := os.WriteFile(filepath.Join(r.workDir, "app.js"), []byte(code), 0o644); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(r.workDir, "drift-sdk.js"), []byte(embeddedNodeSDK), 0o644)
+}
+
+func (r *devRunner) generateRuby() error {
+	funcName := atomic_common.FuncNameForLanguage(r.method, r.name, "ruby")
+	sourceModule := strings.TrimSuffix(r.sourceFile, ".rb")
+
+	var tmpl string
+	switch r.method {
+	case "post", "put", "delete", "patch":
+		tmpl = wrapperPostRuby
+	default:
+		tmpl = wrapperGetRuby
+	}
+
+	code := strings.NewReplacer(
+		"{{SOURCE}}", sourceModule,
+		"{{FUNC}}", funcName,
+	).Replace(tmpl)
+
+	if err := os.WriteFile(filepath.Join(r.workDir, "app.rb"), []byte(code), 0o644); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(r.workDir, "drift.rb"), []byte(embeddedRubySDK), 0o644)
+}
+
+func (r *devRunner) generatePHP() error {
+	funcName := atomic_common.FuncNameForLanguage(r.method, r.name, "php")
+	sourceModule := strings.TrimSuffix(r.sourceFile, ".php")
+
+	var tmpl string
+	switch r.method {
+	case "post", "put", "delete", "patch":
+		tmpl = wrapperPostPHP
+	default:
+		tmpl = wrapperGetPHP
+	}
+
+	code := strings.NewReplacer(
+		"{{SOURCE}}", sourceModule,
+		"{{FUNC}}", funcName,
+	).Replace(tmpl)
+
+	if err := os.WriteFile(filepath.Join(r.workDir, "app.php"), []byte(code), 0o644); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(r.workDir, "drift.php"), []byte(embeddedPHPSDK), 0o644)
+}
+
+func (r *devRunner) generateRust() error {
+	funcName := atomic_common.FuncNameForLanguage(r.method, r.name, "rust")
+	sourceModule := strings.TrimSuffix(r.sourceFile, ".rs")
+
+	var tmpl string
+	switch r.method {
+	case "post", "put", "delete", "patch":
+		tmpl = wrapperPostRust
+	default:
+		tmpl = wrapperGetRust
+	}
+
+	code := strings.NewReplacer(
+		"{{SOURCE}}", sourceModule,
+		"{{FUNC}}", funcName,
+	).Replace(tmpl)
+
+	srcDir := filepath.Join(r.workDir, "src")
+	if err := os.MkdirAll(srcDir, 0o750); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(srcDir, "main.rs"), []byte(code), 0o644); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(srcDir, "drift.rs"), []byte(embeddedRustSDK), 0o644); err != nil {
+		return err
+	}
+	// Move user source into src/ if not already there.
+	userSrc := filepath.Join(r.workDir, r.sourceFile)
+	userSrcDest := filepath.Join(srcDir, r.sourceFile)
+	if _, err := os.Stat(userSrc); err == nil {
+		data, _ := os.ReadFile(userSrc)
+		os.WriteFile(userSrcDest, data, 0o644)
+	}
+	// Write Cargo.toml if user doesn't have one.
+	cargoPath := filepath.Join(r.workDir, "Cargo.toml")
+	if _, err := os.Stat(cargoPath); err != nil {
+		os.WriteFile(cargoPath, []byte(cargoTemplate), 0o644)
+	}
+	return nil
+}
+
+// ---------- installDeps (run once at startup) ----------
+
+func (r *devRunner) installDeps() error {
+	switch r.language {
+	case "python":
+		reqPath := filepath.Join(r.srcDir, "requirements.txt")
+		if _, err := os.Stat(reqPath); err != nil {
+			return nil
+		}
+		vendorDir := filepath.Join(r.workDir, "vendor")
+		fmt.Println("📦 Installing Python dependencies...")
+		return runCmd(r.workDir, "pip3", "install", "-t", vendorDir, "-r", reqPath, "--quiet")
+
+	case "node":
+		pkgPath := filepath.Join(r.srcDir, "package.json")
+		if _, err := os.Stat(pkgPath); err != nil {
+			return nil
+		}
+		data, err := os.ReadFile(pkgPath) // #nosec G304 — CLI tool reads user's own project files
+		if err != nil {
+			return err
+		}
+		_ = os.WriteFile(filepath.Join(r.workDir, "package.json"), data, 0o644)
+		if lockData, err := os.ReadFile(filepath.Join(r.srcDir, "package-lock.json")); err == nil {
+			_ = os.WriteFile(filepath.Join(r.workDir, "package-lock.json"), lockData, 0o644)
+		}
+		fmt.Println("📦 Installing Node dependencies...")
+		return runCmd(r.workDir, "npm", "install", "--production", "--silent")
+
+	case "ruby":
+		gemfilePath := filepath.Join(r.srcDir, "Gemfile")
+		if _, err := os.Stat(gemfilePath); err != nil {
+			return nil
+		}
+		data, _ := os.ReadFile(gemfilePath)
+		_ = os.WriteFile(filepath.Join(r.workDir, "Gemfile"), data, 0o644)
+		if lockData, err := os.ReadFile(filepath.Join(r.srcDir, "Gemfile.lock")); err == nil {
+			_ = os.WriteFile(filepath.Join(r.workDir, "Gemfile.lock"), lockData, 0o644)
+		}
+		fmt.Println("📦 Installing Ruby dependencies...")
+		return runCmd(r.workDir, "bundle", "install", "--standalone", "--path", "vendor/bundle", "--without", "development:test", "--quiet")
+
+	case "php":
+		composerPath := filepath.Join(r.srcDir, "composer.json")
+		if _, err := os.Stat(composerPath); err != nil {
+			return nil
+		}
+		data, _ := os.ReadFile(composerPath)
+		_ = os.WriteFile(filepath.Join(r.workDir, "composer.json"), data, 0o644)
+		if lockData, err := os.ReadFile(filepath.Join(r.srcDir, "composer.lock")); err == nil {
+			_ = os.WriteFile(filepath.Join(r.workDir, "composer.lock"), lockData, 0o644)
+		}
+		fmt.Println("📦 Installing PHP dependencies...")
+		return runCmd(r.workDir, "composer", "install", "--no-dev", "--quiet", "--no-interaction")
+
+	default:
+		return nil // Go and Rust deps handled in buildAndRun
+	}
+}
+
+// ---------- buildAndRun ----------
+
 func (r *devRunner) buildAndRun() error {
+	switch r.language {
+	case "python":
+		return r.runInterpreted("python3", "app.py")
+	case "node":
+		return r.runInterpreted("node", "app.js")
+	case "ruby":
+		return r.runInterpreted("ruby", "app.rb")
+	case "php":
+		return r.runInterpreted("php", "app.php")
+	case "rust":
+		return r.buildAndRunRust()
+	default:
+		return r.buildAndRunGo()
+	}
+}
+
+func (r *devRunner) buildAndRunGo() error {
 	// Ensure go.mod/sum deps are available for the temp workspace
 	if err := runCmd(r.workDir, "go", "mod", "download"); err != nil {
 		// Not fatal; the project may not need it, but log it.
@@ -158,6 +448,7 @@ func (r *devRunner) buildAndRun() error {
 	envs, _ := readDotEnv(filepath.Join(r.srcDir, ".env"))
 	runEnv := os.Environ()
 	runEnv = append(runEnv, envs...)
+	runEnv = append(runEnv, fmt.Sprintf("PORT=%d", r.port))
 
 	// Start the process
 	cmd := exec.Command(filepath.Join(r.workDir, "app")) // #nosec G204 — path is a controlled temp workspace
@@ -182,6 +473,75 @@ func (r *devRunner) buildAndRun() error {
 	return nil
 }
 
+func (r *devRunner) buildAndRunRust() error {
+	// Build for local OS/arch (not cross-compiling for local dev).
+	buildArgs := []string{"build", "--release"}
+	if err := runCmd(r.workDir, "cargo", buildArgs...); err != nil {
+		return fmt.Errorf("cargo build: %w", err)
+	}
+
+	r.stopProcess()
+
+	envs, _ := readDotEnv(filepath.Join(r.srcDir, ".env"))
+	runEnv := os.Environ()
+	runEnv = append(runEnv, envs...)
+	runEnv = append(runEnv, fmt.Sprintf("PORT=%d", r.port))
+
+	binaryPath := filepath.Join(r.workDir, "target", "release", "atomic-function")
+	cmd := exec.Command(binaryPath) // #nosec G204 — controlled temp workspace
+	cmd.Dir = r.workDir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Env = runEnv
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("start app: %w", err)
+	}
+
+	r.procLock.Lock()
+	r.proc = cmd
+	r.procLock.Unlock()
+
+	go func() {
+		_ = cmd.Wait()
+	}()
+
+	fmt.Printf("✅ Server started (PID %d)\n", cmd.Process.Pid)
+	return nil
+}
+
+func (r *devRunner) runInterpreted(interpreter, entryPoint string) error {
+	r.stopProcess()
+
+	envs, _ := readDotEnv(filepath.Join(r.srcDir, ".env"))
+	runEnv := os.Environ()
+	runEnv = append(runEnv, envs...)
+	runEnv = append(runEnv, fmt.Sprintf("PORT=%d", r.port))
+
+	cmd := exec.Command(interpreter, entryPoint) // #nosec G204 — controlled interpreter + entry point
+	cmd.Dir = r.workDir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Env = runEnv
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("start %s: %w", interpreter, err)
+	}
+
+	r.procLock.Lock()
+	r.proc = cmd
+	r.procLock.Unlock()
+
+	go func() {
+		_ = cmd.Wait()
+	}()
+
+	fmt.Printf("✅ Server started (PID %d)\n", cmd.Process.Pid)
+	return nil
+}
+
+// ---------- stop / sync / rebuild / watch ----------
+
 func (r *devRunner) stopProcess() {
 	r.procLock.Lock()
 	defer r.procLock.Unlock()
@@ -204,7 +564,7 @@ func (r *devRunner) stopProcess() {
 }
 
 func (r *devRunner) syncWorkspace() error {
-	// Copy entire srcDir → workDir, filtering out junk. Then we overwrite main.go later.
+	// Copy entire srcDir → workDir, filtering out junk. Then we overwrite main/app later.
 	filters := []string{`.git`, `.idea`, `.vscode`, `node_modules`, `vendor`, `app`, `bin`, `dist`}
 	if err := copyDir(r.srcDir, r.workDir, filters); err != nil {
 		return fmt.Errorf("sync workspace: %w", err)
@@ -438,26 +798,31 @@ func readDotEnv(path string) ([]string, error) {
 	return envs, nil
 }
 
-// Attempt to read `port=####` from the annotation line in any .go file at src root.
+// Attempt to read `port=####` from the annotation line in any source file at src root.
 func detectPortFromAnnotation(src string) int {
 	entries, err := os.ReadDir(src)
 	if err != nil {
 		return 0
 	}
 	for _, e := range entries {
-		if !e.IsDir() && strings.HasSuffix(e.Name(), ".go") {
-			b, _ := os.ReadFile(filepath.Join(src, e.Name())) // #nosec G304 — CLI tool reads user's own source files by design
-			line := firstAnnotationLine(string(b))
-			if line == "" {
-				continue
-			}
-			// naive parse for `port=XXXX` tokens
-			for _, tok := range strings.Fields(line) {
-				if strings.HasPrefix(tok, "port=") {
-					p := strings.TrimPrefix(tok, "port=")
-					if n, err := strconv.Atoi(p); err == nil {
-						return n
-					}
+		if e.IsDir() {
+			continue
+		}
+		ext := filepath.Ext(e.Name())
+		if ext != ".go" && ext != ".py" && ext != ".js" && ext != ".rb" && ext != ".php" && ext != ".rs" {
+			continue
+		}
+		b, _ := os.ReadFile(filepath.Join(src, e.Name())) // #nosec G304 — CLI tool reads user's own source files by design
+		line := firstAnnotationLine(string(b))
+		if line == "" {
+			continue
+		}
+		// naive parse for `port=XXXX` tokens
+		for _, tok := range strings.Fields(line) {
+			if strings.HasPrefix(tok, "port=") {
+				p := strings.TrimPrefix(tok, "port=")
+				if n, err := strconv.Atoi(p); err == nil {
+					return n
 				}
 			}
 		}
@@ -466,10 +831,12 @@ func detectPortFromAnnotation(src string) int {
 }
 
 func firstAnnotationLine(src string) string {
-	// Expect a line like: // @atomic route=get:users auth=apikey env=.env port=8081
+	// Expect a line like:
+	//   // @atomic route=get:users auth=apikey env=.env port=8081   (Go)
+	//   # @atomic route=get:users auth=apikey env=.env port=8081    (Python/Node)
 	for _, ln := range strings.Split(src, "\n") {
 		s := strings.TrimSpace(ln)
-		if strings.HasPrefix(s, "// @atomic ") {
+		if strings.HasPrefix(s, "// @atomic ") || strings.HasPrefix(s, "# @atomic ") {
 			return s
 		}
 	}

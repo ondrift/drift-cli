@@ -1,0 +1,7 @@
+const drift = require('./drift-sdk');
+const handler = require('./{{SOURCE}}');
+
+drift.run(async (req) => {
+    const [status, message, payload] = await handler.{{FUNC}}();
+    return { status, message, payload };
+});

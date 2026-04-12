@@ -27,7 +27,7 @@ func Go() *cobra.Command {
 		GroupID:            "development",
 		DisableFlagParsing: true,
 		Args:               cobra.NoArgs,
-		SilenceErrors:      true,
+		SilenceErrors:      false,
 		Run: func(cmd *cobra.Command, args []string) {
 			auth := "none"
 			var method, name string
@@ -35,7 +35,7 @@ func Go() *cobra.Command {
 			// HTTP method
 			methodPrompt := &survey.Select{
 				Message: "Select HTTP method:",
-				Options: []string{"POST", "GET", "PUT", "DELETE"},
+				Options: []string{"POST", "GET", "PUT", "DELETE", "PATCH"},
 				VimMode: true,
 			}
 			_ = survey.AskOne(methodPrompt, &method)
@@ -87,15 +87,16 @@ func GenerateAtomicFunction(name, method, language, auth string) error {
 
 	replacer := strings.NewReplacer(
 		"{{NAME}}", name,
+		"{{METHOD}}", strings.ToLower(method),
 		"{{METHOD_UPPER}}", common.CapitalizeFirst(strings.ToLower(method)),
 		"{{NAME_UPPER}}", common.CapitalizeFirst(strings.ToLower(name)),
 		"{{AUTH}}", auth,
 	)
 
 	switch strings.ToLower(method) {
-	case "post":
+	case "post", "put", "delete", "patch":
 		handler = replacer.Replace(defaultGolangContentsPost)
-	case "get":
+	default:
 		handler = replacer.Replace(defaultGolangContentsGet)
 	}
 

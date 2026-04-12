@@ -53,10 +53,16 @@ func fetchDeployedFunctions() ([]atomicRecord, error) {
 }
 
 func langOrDefault(r atomicRecord) string {
-	if r.Language == "" {
-		return "golang"
+	switch r.Language {
+	case "", "native":
+		return "go"
+	case "python":
+		return "python"
+	case "node":
+		return "node"
+	default:
+		return r.Language
 	}
-	return r.Language
 }
 
 func printFlatTable(records []atomicRecord) {
